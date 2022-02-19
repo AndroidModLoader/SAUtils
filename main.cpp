@@ -2,19 +2,47 @@
 #include <mod/logger.h>
 #include <mod/config.h>
 
+#include <dlfcn.h>
 #include <sautils.h>
 
 /* Same name but can be used for VC too! (!!!not working currently!!!) */
-MYMODCFG(net.rusjj.gtasa.utils, GTA SAUtils, 1.1, RusJJ)
-NEEDGAME(com.rockstargames.gtasa)
+MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.2.0, RusJJ)
+//NEEDGAME(com.rockstargames.gtasa)
 
 uintptr_t pGameLib = 0;
+void* pGameHandle = NULL;
+
+void Redirect(uintptr_t addr, uintptr_t to)
+{
+    if(!addr) return;
+    if(addr & 1)
+    {
+        addr &= ~1;
+        if (addr & 2)
+        {
+            aml->PlaceNOP(addr, 1);
+            addr += 2;
+        }
+        uint32_t hook[2];
+        hook[0] = 0xF000F8DF;
+        hook[1] = to;
+        aml->Write(addr, (uintptr_t)hook, sizeof(hook));
+    }
+    else
+    {
+        uint32_t hook[2];
+        hook[0] = 0xE51FF004;
+        hook[1] = to;
+        aml->Write(addr, (uintptr_t)hook, sizeof(hook));
+    }
+}
 
 extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering
 {
     logger->SetTag("SAUtils");
     pGameLib = aml->GetLib("libGTASA.so");
-    if(pGameLib)
+    pGameHandle = dlopen("libGTASA.so", RTLD_LAZY);
+    if(pGameLib && pGameHandle)
     {
         ((SAUtils*)sautils)->m_eLoadedGame = GTASA_2_00;
         ((SAUtils*)sautils)->InitializeSAUtils();
@@ -22,7 +50,8 @@ extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering
     else
     {
         pGameLib = aml->GetLib("libGTAVC.so");
-        if(pGameLib)
+        pGameHandle = dlopen("libGTAVC.so", RTLD_LAZY);
+        if(pGameLib && pGameHandle)
         {
             ((SAUtils*)sautils)->m_eLoadedGame = GTAVC_1_09;
             ((SAUtils*)sautils)->InitializeVCUtils();

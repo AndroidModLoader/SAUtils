@@ -1,62 +1,94 @@
 #include <mod/amlmod.h>
 #include <mod/logger.h>
+#include <dlfcn.h>
 #include <sautils.h>
 #include <stdint.h>
 #include <vector>
+#include <cstring> // memcpy
 
-struct AdditionalSetting
-{
-    int nSettingId;
-    eTypeOfSettings eType;
-    const char* szName;
-    OnSettingChangedFn fnOnValueChange;
-    OnSettingDrawedFn fnOnValueDraw;
-    bool bIsSlider;
-    int nInitVal;
-    int nSavedVal;
-    int nMaxVal;
-};
+MYMODDECL();
+void Redirect(uintptr_t addr, uintptr_t to);
 
 /* Saves */
 std::vector<AdditionalSetting*> gMoreSettings;
 int nNextSettingNum = MODS_SETTINGS_STARTING_FROM - 1;
 int pNewSettings[8 * MAX_SETTINGS]; // A new char MobileSettings::settings[37*8*4]
+int nCurrentSliderId = 0;
+eTypeOfSettings nCurrentItemTab = Mods;
 
 /* Funcs */
-typedef void* (*TextureDBGetTextureFn)(uintptr_t a1, uintptr_t a2);
 typedef void* (*SettingsAddItemFn)(void* a1, uintptr_t a2);
+uintptr_t (*GetTextureFromDB)(const char*);
+uintptr_t (*ProcessMenuPending)(uintptr_t globalMobileMenuPtr);
+void      (*InitializeMenuPtr)(uintptr_t mobileMenuPtr, const char* topname, bool isCreatedNowMaybeIdk);
 
 /* GTASA Pointers */
 extern uintptr_t pGameLib;
+extern void* pGameHandle;
 unsigned short* gxtErrorString;
-//unsigned char* aScreens;
-SettingsAddItemFn fnSettingsAddItem;
-/* GTASA Pointers */
+SettingsAddItemFn AddSettingsItemFn;
+uintptr_t OnRestoreDefaultsFn;
+uintptr_t OnRestoreDefaultsAudioFn;
+uintptr_t pgMobileMenu;
+int* pCurrentMenuPointer;
+int* dword_6E0090; // Probably "YesOrNo" window is visible
+int* dword_6E0094;
 
-bool bIsThisModdedSlider = false;
-int nSettingId = 0;
-DECL_HOOK(void, SelectScreenRender, uintptr_t self, float a1, float a2, float a3, float a4, float a5, float a6)
+/* SAUtils */
+void AddRestoreDefaultsItem(void* screen, bool isAudio = false)
 {
-    nSettingId = *(int*)(self + 8);
-    if(nSettingId >= MODS_SETTINGS_STARTING_FROM && nSettingId < MAX_SETTINGS && pNewSettings[8 * nSettingId + 7] == 1)
+    ButtonSettingItem* mob_rtd = new ButtonSettingItem;
+    mob_rtd->vtable = pGameLib + 0x66281C;
+    mob_rtd->itemText = "MOB_RTD";
+    mob_rtd->actionFn = isAudio ? OnRestoreDefaultsAudioFn : OnRestoreDefaultsFn;
+    mob_rtd->flag = 0;
+    AddSettingsItemFn(screen, (uintptr_t)mob_rtd);
+}
+void AddSettingsToScreen(void* screen)
+{
+    auto vStart = gMoreSettings.begin();
+    auto vEnd = gMoreSettings.end();
+    while(vStart != vEnd)
     {
-        bIsThisModdedSlider = true;
+        AdditionalSetting* setting = *vStart;
+        if(setting->eType == nCurrentItemTab)
+        {
+            if(setting->byteItemType == Button)
+            {
+                ButtonSettingItem* mob_rtd = new ButtonSettingItem;
+                mob_rtd->vtable = pGameLib + 0x66281C;
+                mob_rtd->itemText = setting->szName;
+                mob_rtd->actionFn = (uintptr_t)(setting->fnOnButtonPressed);
+                mob_rtd->flag = 0;
+                AddSettingsItemFn(screen, (uintptr_t)mob_rtd);
+            }
+            else
+            {
+                uintptr_t menuItem = (uintptr_t)(new char[0x1Cu]);
+                *(uintptr_t*)menuItem = pGameLib + 0x662848;
+                *(const char**)(menuItem + 4) = setting->szName;
+                *(int*)(menuItem + 8) = setting->nSettingId;
+                *(int*)(menuItem + 12) = 0;
+                *(int*)(menuItem + 16) = 0;
+                AddSettingsItemFn(screen, menuItem);
+            }
+        }
+        ++vStart;
     }
-    SelectScreenRender(self, a1, a2, a3, a4, a5, a6);
-    bIsThisModdedSlider = false;
 }
 
 DECL_HOOK(unsigned short*, AsciiToGxtChar, const char* txt, unsigned short* ret)
 {
-    if(bIsThisModdedSlider)
+    if(nCurrentSliderId != 0)
     {
         auto vStart = gMoreSettings.begin();
         auto vEnd = gMoreSettings.end();
         while(vStart != vEnd)
         {
-            if((*vStart)->nSettingId == nSettingId)
+            AdditionalSetting* setting = *vStart;
+            if(setting->nSettingId == nCurrentSliderId)
             {
-                if((*vStart)->fnOnValueDraw != nullptr) return AsciiToGxtChar((*vStart)->fnOnValueDraw(pNewSettings[8 * nSettingId + 2]), ret);
+                if(setting->fnOnValueDraw != NULL) return AsciiToGxtChar(setting->fnOnValueDraw(pNewSettings[8 * nCurrentSliderId + 2]), ret);
                 break;
             }
             ++vStart;
@@ -65,6 +97,37 @@ DECL_HOOK(unsigned short*, AsciiToGxtChar, const char* txt, unsigned short* ret)
     return AsciiToGxtChar(txt, ret);
 }
 
+void SettingsScreenClosed()
+{
+    auto vStart = gMoreSettings.begin();
+    auto vEnd = gMoreSettings.end();
+    while(vStart != vEnd)
+    {
+        AdditionalSetting* setting = *vStart;
+        if(setting->byteItemType != Button && setting->eType == nCurrentItemTab)
+        {
+            int nNewVal = sautils->ValueOfSettingsItem(setting->nSettingId);
+            if(nNewVal != setting->nSavedVal)
+            {
+                if(setting->fnOnValueChange != NULL) setting->fnOnValueChange(setting->nSavedVal, nNewVal);
+                setting->nSavedVal = nNewVal;
+            }
+        }
+        ++vStart;
+    }
+}
+
+DECL_HOOK(void, SelectScreenOnDestroy, void* self)
+{
+    SettingsScreenClosed();
+    SelectScreenOnDestroy(self);
+}
+DECL_HOOK(void, SelectScreenRender, uintptr_t self, float a1, float a2, float a3, float a4, float a5, float a6)
+{
+    nCurrentSliderId = *(int*)(self + 8);
+    if(!(nCurrentSliderId >= MODS_SETTINGS_STARTING_FROM && nCurrentSliderId < MAX_SETTINGS && pNewSettings[8 * nCurrentSliderId + 7] == 1)) nCurrentSliderId = 0;
+    SelectScreenRender(self, a1, a2, a3, a4, a5, a6);
+}
 DECL_HOOK(unsigned short*, GxtTextGet, void* self, const char* txt)
 {
     static unsigned short gxtTxt[0x7F];
@@ -76,161 +139,199 @@ DECL_HOOK(unsigned short*, GxtTextGet, void* self, const char* txt)
     }
     return ret;
 }
+int None(...) {return 0;}
+char szSautilsVer[32];
+uintptr_t OnModSettingsOpened()
+{
+    nCurrentItemTab = Mods;
+    snprintf(szSautilsVer, sizeof(szSautilsVer), "SAUtils v%s", modinfo->VersionString());
+    char* menuScreenPointer = new char[0x44];
+    InitializeMenuPtr((uintptr_t)menuScreenPointer, "Mod Settings", true);
+    *(uintptr_t*)menuScreenPointer = pGameLib + 0x6628D0; // Vtable
 
-bool bPassRTDBtn = false;
-uintptr_t pLatestRTDPointer = 0;
-eTypeOfSettings nLatestSettingsOpened;
-DECL_HOOK(void, SelectScreenAddItem, void* self, uintptr_t item)
-{
-    if(bPassRTDBtn && !strcmp(*(char**)(item + 4), "MOB_RTD"))
+
+    ButtonSettingItem* sautilsVer = new ButtonSettingItem;
+    sautilsVer->vtable = pGameLib + 0x66281C;
+    sautilsVer->itemText = szSautilsVer;
+    sautilsVer->actionFn = (uintptr_t)None;
+    sautilsVer->flag = 0;
+    AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsVer); // SAUtils version
+
+    AddSettingsToScreen((void*)menuScreenPointer); // Custom items
+
+    ButtonSettingItem* sautilsLine = new ButtonSettingItem;
+    sautilsLine->vtable = pGameLib + 0x66281C;
+    sautilsLine->itemText = "";
+    sautilsLine->actionFn = (uintptr_t)None;
+    sautilsLine->flag = 0;
+    AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsLine); // Empty line
+
+
+    *(bool*)(menuScreenPointer + 48) = true; // Ready to be shown!
+    if(*dword_6E0090)
     {
-        pLatestRTDPointer = item;
-        return;
+        (*(void(**)(char*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(*dword_6E0094 + 4 * *dword_6E0090 - 4));
     }
-    SelectScreenAddItem(self, item);
+    if(*pCurrentMenuPointer != 0) ProcessMenuPending(pgMobileMenu);
+    *pCurrentMenuPointer = (int)menuScreenPointer;
+    return pgMobileMenu;
 }
-void AddSettingsToScreen(void* screen)
+DECL_HOOK(uintptr_t, SettingsScreen, uintptr_t self)
 {
-    auto vStart = gMoreSettings.begin();
-    auto vEnd = gMoreSettings.end();
-    while(vStart != vEnd)
+    SettingsScreen(self);
+
+    // New "Mods" tab should be there!
+    uintptr_t tex = GetTextureFromDB("menu_mainsettings");
+    ++*(int*)(tex + 84); // Num of usages?
+    int& tabsCount = *(int*)(self + 64);
+    uintptr_t container; // Maybe a storage for those tabs
+    if(*(int*)(self + 60) >= tabsCount + 1) // If we have a place for tabs
     {
-        if((*vStart)->eType == nLatestSettingsOpened)
+        container = *(uintptr_t*)(self + 68);
+    }
+    else // If we dont have a place for tabs, reallocate more
+    {
+        int reallocCount = 4 * (tabsCount + 1) / 3u + 3;
+        void* newContainer = malloc(12 * reallocCount);
+        void* oldContainer = *(void **)(self + 68);
+        container = (uintptr_t)newContainer;
+        if (oldContainer)
         {
-            uintptr_t menuItem = (uintptr_t)(new char[0x1Cu]);
-            *(uintptr_t*)menuItem = pGameLib + 0x662848;
-            *(const char**)(menuItem + 4) = (*vStart)->szName;
-            *(int*)(menuItem + 8) = (*vStart)->nSettingId;
-            *(int*)(menuItem + 12) = 0;
-            *(int*)(menuItem + 16) = 0;
-            SelectScreenAddItem(screen, menuItem);
+            memcpy(newContainer, *(const void **)(self + 68), 12 * tabsCount);
+            free(oldContainer);
+            tabsCount = *(int*)(self + 64);
         }
-        ++vStart;
+        *(int*)(self + 60) = reallocCount;
+        *(int*)(self + 68) = (int)container;
     }
-    // Bring back "Reset To Defaults" button
-    if(pLatestRTDPointer != 0) SelectScreenAddItem(screen, pLatestRTDPointer);
-}
-void SettingsScreenClosed()
-{
-    auto vStart = gMoreSettings.begin();
-    auto vEnd = gMoreSettings.end();
-    while(vStart != vEnd)
-    {
-        if((*vStart)->eType == nLatestSettingsOpened)
-        {
-            int nNewVal = sautils->ValueOfSettingsItem((*vStart)->nSettingId);
-            if(nNewVal != (*vStart)->nSavedVal)
-            {
-                if((*vStart)->fnOnValueChange != nullptr) (*vStart)->fnOnValueChange((*vStart)->nSavedVal, nNewVal);
-                (*vStart)->nSavedVal = nNewVal;
-            }
-        }
-        ++vStart;
-    }
+    container = container + 12 * tabsCount;
+    *(uintptr_t*)(container + 0) = tex;
+    *(const char**)(container + 4) = "Mods settings";
+    *(uintptr_t*)(container + 8) = (uintptr_t)OnModSettingsOpened;
+    ++tabsCount;
+    // New "Mods" tab should be there!
+
+    return self;
 }
 
-DECL_HOOK(void*, NewScreen_Controls, void* self)
+uintptr_t NewScreen_Controls_backto;
+extern "C" void NewScreen_Controls_inject(void* self)
 {
-    pLatestRTDPointer = 0;
-    bPassRTDBtn = true;
-    void* ret = NewScreen_Controls(self);
-    bPassRTDBtn = false;
-    nLatestSettingsOpened = Controller;
+    nCurrentItemTab = Controller;
     AddSettingsToScreen(self);
-    return ret;
+    AddRestoreDefaultsItem(self);
+}
+__attribute__((optnone)) __attribute__((naked)) void NewScreen_Controls_stub(void)
+{
+    asm("PUSH {R0}\nMOV R0, R8");
+    asm("BL NewScreen_Controls_inject");
+    asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Controls_backto));
+    asm("POP {R0}\nBX R12");
 }
 
-DECL_HOOK(void*, NewScreen_Game, void* self)
+uintptr_t NewScreen_Game_backto;
+extern "C" void NewScreen_Game_inject(void* self)
 {
-    pLatestRTDPointer = 0;
-    bPassRTDBtn = true;
-    void* ret = NewScreen_Game(self);
-    bPassRTDBtn = false;
-    nLatestSettingsOpened = Game;
+    nCurrentItemTab = Game;
     AddSettingsToScreen(self);
-    return ret;
+    AddRestoreDefaultsItem(self);
+}
+__attribute__((optnone)) __attribute__((naked)) void NewScreen_Game_stub(void)
+{
+    asm("PUSH {R0}\nMOV R0, R4");
+    asm("BL NewScreen_Game_inject");
+    asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Game_backto));
+    asm("POP {R0}\nBX R12");
 }
 
-DECL_HOOK(void*, NewScreen_Display, void* self)
+uintptr_t NewScreen_Display_backto;
+extern "C" void NewScreen_Display_inject(void* self)
 {
-    pLatestRTDPointer = 0;
-    bPassRTDBtn = true;
-    void* ret = NewScreen_Display(self);
-    bPassRTDBtn = false;
-    nLatestSettingsOpened = Display;
+    nCurrentItemTab = Display;
     AddSettingsToScreen(self);
-    return ret;
+    AddRestoreDefaultsItem(self);
+}
+__attribute__((optnone)) __attribute__((naked)) void NewScreen_Display_stub(void)
+{
+    asm("PUSH {R0}\nMOV R0, R4");
+    asm("BL NewScreen_Display_inject");
+    asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Display_backto));
+    asm("POP {R0}\nBX R12");
 }
 
-DECL_HOOK(void*, NewScreen_Audio, void* self)
+uintptr_t NewScreen_Audio_backto;
+extern "C" void NewScreen_Audio_inject(void* self)
 {
-    pLatestRTDPointer = 0;
-    bPassRTDBtn = true;
-    void* ret = NewScreen_Audio(self);
-    bPassRTDBtn = false;
-    nLatestSettingsOpened = Audio;
+    nCurrentItemTab = Audio;
     AddSettingsToScreen(self);
-    return ret;
+    AddRestoreDefaultsItem(self, true);
+}
+__attribute__((optnone)) __attribute__((naked)) void NewScreen_Audio_stub(void)
+{
+    asm("PUSH {R0}\nMOV R0, R4");
+    asm("BL NewScreen_Audio_inject");
+    asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Audio_backto));
+    asm("POP {R0}\nBX R12");
 }
 
 DECL_HOOK(void*, NewScreen_Language, void* self)
 {
-    pLatestRTDPointer = 0;
-    bPassRTDBtn = true;
-    void* ret = NewScreen_Language(self);
-    bPassRTDBtn = false;
-    nLatestSettingsOpened = Language;
+    nCurrentItemTab = Language;
+    NewScreen_Language(self);
     AddSettingsToScreen(self);
-    return ret;
-}
-
-DECL_HOOK(void, SelectScreenOnDestroy, void* self)
-{
-    SettingsScreenClosed();
-    SelectScreenOnDestroy(self);
+    return self;
 }
 
 void SAUtils::InitializeSAUtils()
 {
-    gxtErrorString = (unsigned short*)(pGameLib + 0xA01A90);
-    //aScreens = (unsigned char*)(pGameLib + 0x6AB480);
-
+    // Bump settings limit
     aml->Unprot(pGameLib + 0x679A40, sizeof(void*));
     *(uintptr_t*)(pGameLib + 0x679A40) = (uintptr_t)pNewSettings;
     memcpy(pNewSettings, (int*)(pGameLib + 0x6E03F4), 1184);
 
-    HOOKPLT(SelectScreenRender, pGameLib + 0x662850);
+    // Hook functions
     HOOKPLT(AsciiToGxtChar, pGameLib + 0x6724F8);
-    HOOKPLT(GxtTextGet, pGameLib + 0x66E78C);
-    HOOKPLT(NewScreen_Controls, pGameLib + 0x675CD8);
-    HOOKPLT(NewScreen_Game, pGameLib + 0x674310);
-    HOOKPLT(NewScreen_Display, pGameLib + 0x675150);
-    HOOKPLT(NewScreen_Audio, pGameLib + 0x66FBA4);
-    HOOKPLT(NewScreen_Language, pGameLib + 0x675D90);
-    HOOKPLT(SelectScreenAddItem, pGameLib + 0x674518);
     HOOKPLT(SelectScreenOnDestroy, pGameLib + 0x673FD8);
+    HOOKPLT(SelectScreenRender, pGameLib + 0x662850);
+    HOOKPLT(GxtTextGet, pGameLib + 0x66E78C);
+    HOOKPLT(SettingsScreen, pGameLib + 0x674018);
+    Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;
+    Redirect(pGameLib + 0x2A49F6 + 0x1, (uintptr_t)NewScreen_Game_stub); NewScreen_Game_backto = pGameLib + 0x2A4A1E + 0x1;
+    Redirect(pGameLib + 0x2A4BD4 + 0x1, (uintptr_t)NewScreen_Display_stub); NewScreen_Display_backto = pGameLib + 0x2A4BFC + 0x1;
+    Redirect(pGameLib + 0x2A4D3C + 0x1, (uintptr_t)NewScreen_Audio_stub); NewScreen_Audio_backto = pGameLib + 0x2A4D64 + 0x1;
+    HOOKPLT(NewScreen_Language, pGameLib + 0x675D90);
 
-    fnSettingsAddItem = (SettingsAddItemFn)(pGameLib + 0x19C840);
+    SET_TO(gxtErrorString, pGameLib + 0xA01A90);
+    SET_TO(AddSettingsItemFn, pGameLib + 0x29E85C + 0x1);
+    SET_TO(OnRestoreDefaultsFn, aml->GetSym(pGameHandle, "_ZN12SelectScreen17OnRestoreDefaultsEPS_i"));
+    SET_TO(OnRestoreDefaultsAudioFn, aml->GetSym(pGameHandle, "_ZN11AudioScreen17OnRestoreDefaultsEP12SelectScreeni"));
+    SET_TO(GetTextureFromDB, aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
+    SET_TO(pgMobileMenu, aml->GetSym(pGameHandle, "gMobileMenu"));
+    SET_TO(ProcessMenuPending, aml->GetSym(pGameHandle, "_ZN10MobileMenu14ProcessPendingEv"));
+    SET_TO(InitializeMenuPtr, aml->GetSym(pGameHandle, "_ZN16CharSelectScreenC2EPKcb"));
+    SET_TO(pCurrentMenuPointer, pGameLib + 0x6E0098);
+    SET_TO(dword_6E0090, pGameLib + 0x6E0090);
+    SET_TO(dword_6E0094, pGameLib + 0x6E0094);
 }
 void SAUtils::InitializeVCUtils()
 {
     gxtErrorString = (unsigned short*)(pGameLib + 0x716C2C);
-    //aScreens = (unsigned char*)(pGameLib + 0x6AB480);
 
-    aml->Unprot(pGameLib + 0x679A40, sizeof(void*));
-    *(uintptr_t*)(pGameLib + 0x679A40) = (uintptr_t)pNewSettings;
-    memcpy(pNewSettings, (int*)(pGameLib + 0x6E03F4), 1184);
+    //aml->Unprot(pGameLib + 0x679A40, sizeof(void*));
+    //*(uintptr_t*)(pGameLib + 0x679A40) = (uintptr_t)pNewSettings;
+    //memcpy(pNewSettings, (int*)(pGameLib + 0x6E03F4), 1184);
 
-    HOOKPLT(GxtTextGet, pGameLib + 0x66E78C);
-    HOOKPLT(NewScreen_Controls, pGameLib + 0x675CD8);
-    HOOKPLT(NewScreen_Game, pGameLib + 0x674310);
-    HOOKPLT(NewScreen_Display, pGameLib + 0x675150);
-    HOOKPLT(NewScreen_Audio, pGameLib + 0x66FBA4);
-    HOOKPLT(NewScreen_Language, pGameLib + 0x675D90);
-    HOOKPLT(SelectScreenAddItem, pGameLib + 0x674518);
-    HOOKPLT(SelectScreenOnDestroy, pGameLib + 0x673FD8);
+    HOOK(GxtTextGet, dlsym(pGameHandle, "_ZN5CText3GetEPKc"));
+    HOOK(AsciiToGxtChar, dlsym(pGameHandle, "_Z14AsciiToUnicodePKcPt"));
+    //HOOKPLT(NewScreen_Controls, pGameLib + 0x675CD8);
+    //HOOKPLT(NewScreen_Game, pGameLib + 0x674310);
+    //HOOKPLT(NewScreen_Display, pGameLib + 0x675150);
+    //HOOKPLT(NewScreen_Audio, pGameLib + 0x66FBA4);
+    //HOOKPLT(NewScreen_Language, pGameLib + 0x675D90);
+    //HOOKPLT(SelectScreenAddItem, pGameLib + 0x674518);
+    HOOK(SelectScreenOnDestroy, dlsym(pGameHandle, "_ZN12CMenuManager4BackEv"));
 
-    fnSettingsAddItem = (SettingsAddItemFn)(pGameLib + 0x19C840);
+    //fnSettingsAddItem = (SettingsAddItemFn)(pGameLib + 0x19C840);
 }
 
 
@@ -254,7 +355,7 @@ int SAUtils::AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initV
     pNew->eType = typeOf;
     pNew->szName = name;
     pNew->fnOnValueChange = fnOnValueChange;
-    pNew->bIsSlider = isSlider;
+    pNew->byteItemType = isSlider ? Slider : WithItems;
     pNew->nInitVal = (int)initVal;
     pNew->nSavedVal = (int)initVal;
     pNew->nMaxVal = maxVal;
@@ -287,8 +388,9 @@ int SAUtils::AddClickableItem(eTypeOfSettings typeOf, const char* name, int init
     pNew->eType = typeOf;
     pNew->szName = name;
     pNew->fnOnValueChange = fnOnValueChange;
-    pNew->fnOnValueDraw = nullptr;
-    pNew->bIsSlider = false;
+    pNew->fnOnValueDraw = NULL;
+    pNew->fnOnButtonPressed = NULL;
+    pNew->byteItemType = WithItems;
     pNew->nInitVal = (int)initVal;
     pNew->nSavedVal = (int)initVal;
     pNew->nMaxVal = maxVal;
@@ -313,19 +415,39 @@ int SAUtils::AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal
     pNew->szName = name;
     pNew->fnOnValueChange = fnOnValueChange;
     pNew->fnOnValueDraw = fnOnValueDraw;
-    pNew->bIsSlider = true;
+    pNew->fnOnButtonPressed = NULL;
+    pNew->byteItemType = Slider;
     pNew->nInitVal = (int)initVal;
     pNew->nSavedVal = (int)initVal;
     pNew->nMaxVal = maxVal;
     gMoreSettings.push_back(pNew);
 
-    pNewSettings[8 * nNextSettingNum + 1] = (int)nullptr;
+    pNewSettings[8 * nNextSettingNum + 1] = (int)NULL;
     pNewSettings[8 * nNextSettingNum + 2] = initVal;
     pNewSettings[8 * nNextSettingNum + 4] = minVal;
     pNewSettings[8 * nNextSettingNum + 5] = maxVal;
     pNewSettings[8 * nNextSettingNum + 7] = 1;
 
     return nNextSettingNum;
+}
+
+// 1.2
+void SAUtils::AddButton(eTypeOfSettings typeOf, const char* name, OnButtonPressedFn fnOnButtonPressed)
+{
+    if(fnOnButtonPressed == NULL) return;
+
+    AdditionalSetting* pNew = new AdditionalSetting;
+    pNew->nSettingId = -1;
+    pNew->eType = typeOf;
+    pNew->szName = name;
+    pNew->fnOnValueChange = NULL;
+    pNew->fnOnValueDraw = NULL;
+    pNew->fnOnButtonPressed = fnOnButtonPressed;
+    pNew->byteItemType = Button;
+    pNew->nInitVal = 0;
+    pNew->nSavedVal = 0;
+    pNew->nMaxVal = 0;
+    gMoreSettings.push_back(pNew);
 }
 
 static SAUtils sautilsLocal;

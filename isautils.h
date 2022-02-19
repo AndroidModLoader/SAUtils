@@ -1,7 +1,8 @@
 #include <stdint.h>
 
-typedef void (*OnSettingChangedFn)(int nOldValue, int nNewValue);
-typedef const char* (*OnSettingDrawedFn)(int nNewValue);
+typedef void        (*OnSettingChangedFn)(int nOldValue, int nNewValue);
+typedef const char* (*OnSettingDrawedFn) (int nNewValue);
+typedef void        (*OnButtonPressedFn) (uintptr_t screen); // Screen is just a pointer of SelectScreen if you need it...
 
 enum eTypeOfSettings : unsigned char
 {
@@ -10,6 +11,18 @@ enum eTypeOfSettings : unsigned char
     Display = 2,
     Audio = 3,
     Language = 4,
+    Mods = 5,
+
+    SETTINGS_COUNT,
+};
+
+enum eTypeOfItem : unsigned char
+{
+    WithItems = 0,
+    Slider = 1,
+    Button = 2,
+
+    ITEMTYPES_COUNT,
 };
 
 class ISAUtils
@@ -23,11 +36,11 @@ public:
      */
     virtual uintptr_t IsFLALoaded() = 0;
     
-    // switchesArray is an array of items of clickable item (isSlider = false)
+    // switchesArray is an array of items of clickable item (byteItemType = WithItems)
     #if __cplusplus >= 201300 // Do not create errors on C++11 and lower :P
       [[deprecated("Use AddClickableItem or AddSliderItem")]]
     #endif
-    virtual int AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = nullptr, bool isSlider = false, void* switchesArray = nullptr) = 0;
+    virtual int AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, bool isSlider = false, void* switchesArray = NULL) = 0;
 
     /** Get a value of setting (returned by AddClickableItem or AddSliderItem)
      *
@@ -49,7 +62,7 @@ public:
      *  \param fnOnValueChange A function that will be called on value being saved (def: null)
      *  \return Setting ID
      */
-    virtual int AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, const char** switchesArray = nullptr, OnSettingChangedFn fnOnValueChange = nullptr) = 0;
+    virtual int AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, const char** switchesArray = NULL, OnSettingChangedFn fnOnValueChange = NULL) = 0;
 
     /** Adds a slider in menu settings
      *
@@ -62,5 +75,13 @@ public:
      *  \param fnOnValueDraw A function that will control a text of a slider (def: null)
      *  \return Setting ID
      */
-    virtual int AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = nullptr, OnSettingDrawedFn fnOnValueDraw = nullptr) = 0;
+    virtual int AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, OnSettingDrawedFn fnOnValueDraw = NULL) = 0;
+
+    /** Adds a clickable button in menu settings
+     *
+     *  \param typeOf In which setting option that item should be added
+     *  \param name Obviously a displayed name
+     *  \param fnOnButtonPressed A function that will be called on button press (def: null)
+     */
+    virtual void AddButton(eTypeOfSettings typeOf, const char* name, OnButtonPressedFn fnOnButtonPressed = NULL) = 0;
 };

@@ -11,29 +11,38 @@
 class IAML
 {
 public:
-    /* AML 1.0.0 */
+    /* AML 1.0.0.0 */
     virtual const char* GetCurrentGame() = 0;
     virtual const char* GetConfigPath() = 0;
     virtual bool HasMod(const char* szGUID) = 0;
     virtual bool HasModOfVersion(const char* szGUID, const char* szVersion) = 0;
     virtual uintptr_t GetLib(const char* szLib) = 0;
-    virtual uintptr_t GetSym(uintptr_t handle, const char* sym) = 0;
-    virtual void Hook(void* handle, void* fnAddress, void** orgFnAddress = nullptr) = 0;
-    virtual void HookPLT(void* handle, void* fnAddress, void** orgFnAddress = nullptr) = 0;
+    virtual uintptr_t GetSym(void* handle, const char* sym) = 0;
+    virtual bool Hook(void* handle, void* fnAddress, void** orgFnAddress = NULL) = 0; // AML 1.0.0.5: Returns true on success
+    virtual void HookPLT(void* handle, void* fnAddress, void** orgFnAddress = NULL) = 0;
     virtual int Unprot(uintptr_t handle, size_t len = PAGE_SIZE) = 0;
     virtual void Write(uintptr_t dest, uintptr_t src, size_t size) = 0;
     virtual void Read(uintptr_t src, uintptr_t dest, size_t size) = 0;
     virtual void PlaceNOP(uintptr_t addr, size_t count = 1) = 0; // Untested on ARMv8
     virtual void PlaceJMP(uintptr_t addr, uintptr_t dest) = 0; // Untested on ARMv8
     virtual void PlaceRET(uintptr_t addr) = 0; // Untested on ARMv8
+
+    /* AML 1.0.0.4 */
+    virtual const char* GetDataPath() = 0; // /data/data/.../*
+
+    /* AML 1.0.0.5 */
+    virtual const char* GetAndroidDataPath() = 0; // /sdcard/Android/data/.../files/*
+    virtual uintptr_t GetSym(uintptr_t libAddr, const char* sym) = 0; // An additional func but it uses ADDRESS instead of HANDLE
+
+    /* AML 1.0.0.6 */
+    virtual void Redirect(uintptr_t addr, uintptr_t to) = 0; // Move directly to "to" from "addr" with saving stack
 };
 
 extern IAML* aml;
-inline IAML* GetAMLInterface()
-{
-    return aml;
-}
+inline IAML* GetAMLInterface() { return aml; }
 
+/* Do not use big conversions */
+#define SET_TO(__a1, __a2) *(void**)&(__a1) = (void*)(__a2)
 
 /* Unprotect that memory chunk for making changes */
 #define UNPROT(_addr, ...)                                      \
@@ -52,19 +61,19 @@ inline IAML* GetAMLInterface()
 	void HookOf_##_name(__VA_ARGS__)
 /* Just a hook of a function */
 #define HOOK(_name, _fnAddr)                                    \
-    aml->Hook((void*)(_fnAddr), (void*)(&HookOf_##_name), (void**)(&_name));
+    aml->Hook((void*)(_fnAddr), (void*)(&HookOf_##_name), (void**)(&_name))
 /* Just a hook of a function located in PLT section (by address!) */
 #define HOOKPLT(_name, _fnAddr)                                 \
-    aml->HookPLT((void*)(_fnAddr), (void*)(&HookOf_##_name), (void**)(&_name));
+    aml->HookPLT((void*)(_fnAddr), (void*)(&HookOf_##_name), (void**)(&_name))
 /* Just a hook of a function hidden behind IL2CPP */
 #define HOOK_IL2CPP(_name, _methodInfo)                         \
-    aml->Hook((void*)_methodInfo->methodPointer, (void*)(&HookOf_##_name), (void**)(&_name));
+    aml->Hook((void*)_methodInfo->methodPointer, (void*)(&HookOf_##_name), (void**)(&_name))
 /* Unhook a function (unsafe, actually) */
 #define UNHOOK(_name, _fnAddr)                                  \
-    aml->Hook((void*)(_fnAddr), (void*)(&_name), (void**)0);
+    aml->Hook((void*)(_fnAddr), (void*)(&_name), (void**)0)
 /* Unhook an IL2CPP function (unsafe, actually) */
 #define UNHOOK_IL2CPP(_name, _methodInfo)                       \
-    aml->Hook((void*)_methodInfo->methodPointer, (void*)(&_name), (void**)0);
+    aml->Hook((void*)_methodInfo->methodPointer, (void*)(&_name), (void**)0)
 
 /* Just a hook decl with saveable original function pointer */
 #define DECL_HOOK2(_ret, _name, ...)                            \
@@ -79,17 +88,17 @@ inline IAML* GetAMLInterface()
 /* Just a hook of a function and save original function pointer */
 #define HOOK2(_name, _fnAddr)                                   \
     fnLocated##_name = (void*)_fnAddr;                          \
-    aml->Hook((void*)(_fnAddr), (void*)(&HookOf_##_name), (void**)(&_name));
+    aml->Hook((void*)(_fnAddr), (void*)(&HookOf_##_name), (void**)(&_name))
 /* Just a hook of a function located in PLT section (by address!) and save original function pointer */
 #define HOOK2PLT(_name, _fnAddr)                                \
     fnLocated##_name = (void*)_fnAddr;                          \
-    aml->HookPLT((void*)(_fnAddr), (void*)(&HookOf_##_name), (void**)(&_name));
+    aml->HookPLT((void*)(_fnAddr), (void*)(&HookOf_##_name), (void**)(&_name))
 /* Just a hook of a function hidden behind IL2CPP and save original function pointer */
 #define HOOK2_IL2CPP(_name, _methodInfo)                        \
     fnLocated##_name = (void*)_methodInfo->methodPointer;       \
-    aml->Hook((void*)_methodInfo->methodPointer, (void*)(&HookOf_##_name), (void**)(&_name));
+    aml->Hook((void*)_methodInfo->methodPointer, (void*)(&HookOf_##_name), (void**)(&_name))
 /* Unhook a function (unsafe, actually) that was saved before */
 #define UNHOOK2(_name)                                          \
-    aml->Hook(fnLocated##_name, (void*)(&_name), (void**)0);
+    aml->Hook(fnLocated##_name, (void*)(&_name), (void**)0)
 
 #endif // _IAML

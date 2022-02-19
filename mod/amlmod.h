@@ -3,7 +3,9 @@
 
 #include "iaml.h"
 #include <stdio.h>
-#include <string>
+#include <ctype.h>
+#include <cstring>
+#include <stdlib.h>
 
 #ifdef __clang__
     #define TARGET_ARM __attribute__((target("no-thumb-mode")))
@@ -12,8 +14,10 @@
 
 #ifdef __GNUC__
     #define ASM_NAKED __attribute__((naked))
+    #define EXPORT __attribute__((visibility("default")))
 #else
     #define ASM_NAKED __declspec(naked)
+    #define EXPORT
 #endif
 
 #define MYMOD(_guid, _name, _version, _author)                          \
@@ -23,10 +27,7 @@
     IAML* aml = (IAML*)GetInterface("AMLInterface");
 
 #define MYMODCFG(_guid, _name, _version, _author)                       \
-    static ModInfo modinfoLocal(#_guid, #_name, #_version, #_author);   \
-    ModInfo* modinfo = &modinfoLocal;                                   \
-    extern "C" ModInfo* __GetModInfo() { return modinfo; }              \
-    IAML* aml = (IAML*)GetInterface("AMLInterface");                    \
+    MYMOD(_guid, _name, _version, _author);                             \
     static Config cfgLocal(#_guid);                                     \
     Config* cfg = &cfgLocal;
 
@@ -49,7 +50,6 @@
 #define END_DEPLIST()                                                   \
     {"", ""} };                                                         \
     extern "C" ModInfoDependency* __GetDepsList() { return &g_listDependencies[0]; }
-
 
 
 struct ModInfoDependency
@@ -97,7 +97,7 @@ public:
     inline unsigned short Minor() { return minor; }
     inline unsigned short Revision() { return revision; }
     inline unsigned short Build() { return build; }
-    inline uintptr_t Handle() { return handle; }
+    inline void* Handle() { return handle; }
 private:
     char szGUID[48];
     char szName[48];
@@ -107,7 +107,7 @@ private:
     unsigned short minor;
     unsigned short revision;
     unsigned short build;
-    uintptr_t handle;
+    void* handle;
     ModInfoDependency* dependencies;
 
     friend class ModsList;

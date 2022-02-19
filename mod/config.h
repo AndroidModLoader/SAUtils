@@ -1,3 +1,6 @@
+#ifndef _CONFIG
+#define _CONFIG
+
 /* Is not required. Can be used only for a smaller size of mod (~480kb savings) */
 #include "icfg.h"
 
@@ -48,3 +51,5 @@ private:
     friend class Config;
 };
 extern Config* cfg;
+
+#endif // _CONFIG
