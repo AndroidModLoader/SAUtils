@@ -49,12 +49,17 @@ extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering
     }
     else
     {
-        pGameLib = aml->GetLib("libGTAVC.so");
-        pGameHandle = dlopen("libGTAVC.so", RTLD_LAZY);
-        if(pGameLib && pGameHandle)
+        //pGameLib = aml->GetLib("libGTAVC.so");
+        //pGameHandle = dlopen("libGTAVC.so", RTLD_LAZY);
+        //if(pGameLib && pGameHandle)
+        //{
+        //    ((SAUtils*)sautils)->m_eLoadedGame = GTAVC_1_09;
+        //    ((SAUtils*)sautils)->InitializeVCUtils();
+        //}
+        //else
         {
-            ((SAUtils*)sautils)->m_eLoadedGame = GTAVC_1_09;
-            ((SAUtils*)sautils)->InitializeVCUtils();
+            logger->Error("Cannot determine the working game or this one is not supported!");
+            return;
         }
     }
 

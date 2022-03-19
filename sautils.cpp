@@ -6,21 +6,33 @@
 #include <vector>
 #include <cstring> // memcpy
 
+#include "GTASA_STRUCTS.h"
+
 MYMODDECL();
 void Redirect(uintptr_t addr, uintptr_t to);
 
 /* Saves */
 std::vector<AdditionalSetting*> gMoreSettings;
+std::vector<AdditionalTexDB*>   gMoreTexDBs;
+std::vector<const char*>        gMoreIMGs;
 int nNextSettingNum = MODS_SETTINGS_STARTING_FROM - 1;
-int pNewSettings[8 * MAX_SETTINGS]; // A new char MobileSettings::settings[37*8*4]
 int nCurrentSliderId = 0;
 eTypeOfSettings nCurrentItemTab = Mods;
+bool g_bIsGameStartedAlready = false;
+
+/* Patches vars */
+int pNewSettings[8 * MAX_SETTINGS]; // A new char MobileSettings::settings[37*8*4]
+char pNewStreamingFiles[48 * (MAX_IMG_ARCHIVES + 2)]; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
 
 /* Funcs */
 typedef void* (*SettingsAddItemFn)(void* a1, uintptr_t a2);
-uintptr_t (*GetTextureFromDB)(const char*);
+RwTexture* (*GetTextureFromDB)(const char*);
 uintptr_t (*ProcessMenuPending)(uintptr_t globalMobileMenuPtr);
 void      (*InitializeMenuPtr)(uintptr_t mobileMenuPtr, const char* topname, bool isCreatedNowMaybeIdk);
+uintptr_t (*LoadTextureDB)(const char* dbFile, bool fullLoad, int txdbFormat);
+void      (*RegisterTextureDB)(uintptr_t dbPtr);
+int       (*CdStreamOpen)(const char* filename, bool);
+int       AddImageToListPatched(const char* imgName, bool isPlayerImg = false);
 
 /* GTASA Pointers */
 extern uintptr_t pGameLib;
@@ -46,11 +58,10 @@ void AddRestoreDefaultsItem(void* screen, bool isAudio = false)
 }
 void AddSettingsToScreen(void* screen)
 {
-    auto vStart = gMoreSettings.begin();
-    auto vEnd = gMoreSettings.end();
-    while(vStart != vEnd)
+    int size = gMoreSettings.size();
+    for(int i = 0; i < size; ++i)
     {
-        AdditionalSetting* setting = *vStart;
+        AdditionalSetting* setting = gMoreSettings[i];
         if(setting->eType == nCurrentItemTab)
         {
             if(setting->byteItemType == Button)
@@ -73,7 +84,6 @@ void AddSettingsToScreen(void* screen)
                 AddSettingsItemFn(screen, menuItem);
             }
         }
-        ++vStart;
     }
 }
 
@@ -81,17 +91,15 @@ DECL_HOOK(unsigned short*, AsciiToGxtChar, const char* txt, unsigned short* ret)
 {
     if(nCurrentSliderId != 0)
     {
-        auto vStart = gMoreSettings.begin();
-        auto vEnd = gMoreSettings.end();
-        while(vStart != vEnd)
+        int size = gMoreSettings.size();
+        for(int i = 0; i < size; ++i)
         {
-            AdditionalSetting* setting = *vStart;
+            AdditionalSetting* setting = gMoreSettings[i];
             if(setting->nSettingId == nCurrentSliderId)
             {
                 if(setting->fnOnValueDraw != NULL) return AsciiToGxtChar(setting->fnOnValueDraw(pNewSettings[8 * nCurrentSliderId + 2]), ret);
                 break;
             }
-            ++vStart;
         }
     }
     return AsciiToGxtChar(txt, ret);
@@ -99,11 +107,10 @@ DECL_HOOK(unsigned short*, AsciiToGxtChar, const char* txt, unsigned short* ret)
 
 void SettingsScreenClosed()
 {
-    auto vStart = gMoreSettings.begin();
-    auto vEnd = gMoreSettings.end();
-    while(vStart != vEnd)
+    int size = gMoreSettings.size();
+    for(int i = 0; i < size; ++i)
     {
-        AdditionalSetting* setting = *vStart;
+        AdditionalSetting* setting = gMoreSettings[i];
         if(setting->byteItemType != Button && setting->eType == nCurrentItemTab)
         {
             int nNewVal = sautils->ValueOfSettingsItem(setting->nSettingId);
@@ -113,7 +120,6 @@ void SettingsScreenClosed()
                 setting->nSavedVal = nNewVal;
             }
         }
-        ++vStart;
     }
 }
 
@@ -167,7 +173,7 @@ uintptr_t OnModSettingsOpened()
     AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsLine); // Empty line
 
 
-    *(bool*)(menuScreenPointer + 48) = true; // Ready to be shown!
+    *(bool*)(menuScreenPointer + 48) = true; // Ready to be shown! Or... the other thingy?
     if(*dword_6E0090)
     {
         (*(void(**)(char*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(*dword_6E0094 + 4 * *dword_6E0090 - 4));
@@ -181,8 +187,8 @@ DECL_HOOK(uintptr_t, SettingsScreen, uintptr_t self)
     SettingsScreen(self);
 
     // New "Mods" tab should be there!
-    uintptr_t tex = GetTextureFromDB("menu_mainsettings");
-    ++*(int*)(tex + 84); // Num of usages?
+    RwTexture* tex = GetTextureFromDB("menu_mainsettings");
+    ++tex->refCount;
     int& tabsCount = *(int*)(self + 64);
     uintptr_t container; // Maybe a storage for those tabs
     if(*(int*)(self + 60) >= tabsCount + 1) // If we have a place for tabs
@@ -205,7 +211,7 @@ DECL_HOOK(uintptr_t, SettingsScreen, uintptr_t self)
         *(int*)(self + 68) = (int)container;
     }
     container = container + 12 * tabsCount;
-    *(uintptr_t*)(container + 0) = tex;
+    *(RwTexture**)(container + 0) = tex;
     *(const char**)(container + 4) = "Mods settings";
     *(uintptr_t*)(container + 8) = (uintptr_t)OnModSettingsOpened;
     ++tabsCount;
@@ -214,27 +220,69 @@ DECL_HOOK(uintptr_t, SettingsScreen, uintptr_t self)
     return self;
 }
 
-uintptr_t NewScreen_Controls_backto;
+DECL_HOOKv(InitialiseRenderWare)
+{
+    InitialiseRenderWare();
+
+    auto vStart = gMoreTexDBs.begin();
+    auto vEnd = gMoreTexDBs.end();
+    AdditionalTexDB* tdb;
+    uintptr_t dbPtr;
+    while(vStart != vEnd)
+    {
+        tdb = *vStart;
+        dbPtr = LoadTextureDB(tdb->szName, false, 5);
+        if(dbPtr != 0 && tdb->bRegister) RegisterTextureDB(dbPtr);
+        ++vStart;
+    }
+}
+
+DECL_HOOKv(InitialiseGame_SecondPass)
+{
+    InitialiseGame_SecondPass();
+
+    auto vStart = gMoreIMGs.begin();
+    auto vEnd = gMoreIMGs.end();
+    while(vStart != vEnd)
+    {
+        AddImageToListPatched(*vStart, false);
+        ++vStart;
+    }
+    g_bIsGameStartedAlready = true;
+}
+
+uintptr_t NewScreen_Controls_backto, NewScreen_Game_backto, NewScreen_Display_backto, NewScreen_Audio_backto;
 extern "C" void NewScreen_Controls_inject(void* self)
 {
     nCurrentItemTab = Controller;
     AddSettingsToScreen(self);
     AddRestoreDefaultsItem(self);
 }
+extern "C" void NewScreen_Game_inject(void* self)
+{
+    nCurrentItemTab = Game;
+    AddSettingsToScreen(self);
+    AddRestoreDefaultsItem(self);
+}
+extern "C" void NewScreen_Display_inject(void* self)
+{
+    nCurrentItemTab = Display;
+    AddSettingsToScreen(self);
+    AddRestoreDefaultsItem(self);
+}
+extern "C" void NewScreen_Audio_inject(void* self)
+{
+    nCurrentItemTab = Audio;
+    AddSettingsToScreen(self);
+    AddRestoreDefaultsItem(self, true);
+}
+
 __attribute__((optnone)) __attribute__((naked)) void NewScreen_Controls_stub(void)
 {
     asm("PUSH {R0}\nMOV R0, R8");
     asm("BL NewScreen_Controls_inject");
     asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Controls_backto));
     asm("POP {R0}\nBX R12");
-}
-
-uintptr_t NewScreen_Game_backto;
-extern "C" void NewScreen_Game_inject(void* self)
-{
-    nCurrentItemTab = Game;
-    AddSettingsToScreen(self);
-    AddRestoreDefaultsItem(self);
 }
 __attribute__((optnone)) __attribute__((naked)) void NewScreen_Game_stub(void)
 {
@@ -243,28 +291,12 @@ __attribute__((optnone)) __attribute__((naked)) void NewScreen_Game_stub(void)
     asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Game_backto));
     asm("POP {R0}\nBX R12");
 }
-
-uintptr_t NewScreen_Display_backto;
-extern "C" void NewScreen_Display_inject(void* self)
-{
-    nCurrentItemTab = Display;
-    AddSettingsToScreen(self);
-    AddRestoreDefaultsItem(self);
-}
 __attribute__((optnone)) __attribute__((naked)) void NewScreen_Display_stub(void)
 {
     asm("PUSH {R0}\nMOV R0, R4");
     asm("BL NewScreen_Display_inject");
     asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Display_backto));
     asm("POP {R0}\nBX R12");
-}
-
-uintptr_t NewScreen_Audio_backto;
-extern "C" void NewScreen_Audio_inject(void* self)
-{
-    nCurrentItemTab = Audio;
-    AddSettingsToScreen(self);
-    AddRestoreDefaultsItem(self, true);
 }
 __attribute__((optnone)) __attribute__((naked)) void NewScreen_Audio_stub(void)
 {
@@ -282,6 +314,22 @@ DECL_HOOK(void*, NewScreen_Language, void* self)
     return self;
 }
 
+int AddImageToListPatched(const char* imgName, bool isPlayerImg)
+{
+    for(unsigned char i = 0; i < (MAX_IMG_ARCHIVES + 2); ++i)
+    {
+        if(pNewStreamingFiles[48 * i + 0] == '\0')
+        {
+            strcpy(&pNewStreamingFiles[48 * i + 0], imgName);
+            pNewStreamingFiles[48 * i + 40] = isPlayerImg;
+            *(int*)(&pNewStreamingFiles[48 * i + 44]) = CdStreamOpen(imgName, false);
+            return i;
+        }
+    }
+    logger->Error("Not enough space in CStreaming::ms_files for %s!", imgName);
+    return 0;
+}
+
 void SAUtils::InitializeSAUtils()
 {
     // Bump settings limit
@@ -290,28 +338,45 @@ void SAUtils::InitializeSAUtils()
     memcpy(pNewSettings, (int*)(pGameLib + 0x6E03F4), 1184);
 
     // Hook functions
-    HOOKPLT(AsciiToGxtChar, pGameLib + 0x6724F8);
-    HOOKPLT(SelectScreenOnDestroy, pGameLib + 0x673FD8);
-    HOOKPLT(SelectScreenRender, pGameLib + 0x662850);
-    HOOKPLT(GxtTextGet, pGameLib + 0x66E78C);
-    HOOKPLT(SettingsScreen, pGameLib + 0x674018);
+    HOOKPLT(AsciiToGxtChar,             pGameLib + 0x6724F8);
+    HOOKPLT(SelectScreenOnDestroy,      pGameLib + 0x673FD8);
+    HOOKPLT(SelectScreenRender,         pGameLib + 0x662850);
+    HOOKPLT(GxtTextGet,                 pGameLib + 0x66E78C);
+    HOOKPLT(SettingsScreen,             pGameLib + 0x674018);
+    HOOKPLT(InitialiseRenderWare,       pGameLib + 0x66F2D0);
+    HOOKPLT(InitialiseGame_SecondPass,  pGameLib + 0x672178);
+
+    // Hooked settings functions
     Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;
     Redirect(pGameLib + 0x2A49F6 + 0x1, (uintptr_t)NewScreen_Game_stub); NewScreen_Game_backto = pGameLib + 0x2A4A1E + 0x1;
     Redirect(pGameLib + 0x2A4BD4 + 0x1, (uintptr_t)NewScreen_Display_stub); NewScreen_Display_backto = pGameLib + 0x2A4BFC + 0x1;
     Redirect(pGameLib + 0x2A4D3C + 0x1, (uintptr_t)NewScreen_Audio_stub); NewScreen_Audio_backto = pGameLib + 0x2A4D64 + 0x1;
-    HOOKPLT(NewScreen_Language, pGameLib + 0x675D90);
+    HOOKPLT(NewScreen_Language,         pGameLib + 0x675D90);
 
-    SET_TO(gxtErrorString, pGameLib + 0xA01A90);
-    SET_TO(AddSettingsItemFn, pGameLib + 0x29E85C + 0x1);
-    SET_TO(OnRestoreDefaultsFn, aml->GetSym(pGameHandle, "_ZN12SelectScreen17OnRestoreDefaultsEPS_i"));
-    SET_TO(OnRestoreDefaultsAudioFn, aml->GetSym(pGameHandle, "_ZN11AudioScreen17OnRestoreDefaultsEP12SelectScreeni"));
-    SET_TO(GetTextureFromDB, aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
-    SET_TO(pgMobileMenu, aml->GetSym(pGameHandle, "gMobileMenu"));
-    SET_TO(ProcessMenuPending, aml->GetSym(pGameHandle, "_ZN10MobileMenu14ProcessPendingEv"));
-    SET_TO(InitializeMenuPtr, aml->GetSym(pGameHandle, "_ZN16CharSelectScreenC2EPKcb"));
-    SET_TO(pCurrentMenuPointer, pGameLib + 0x6E0098);
-    SET_TO(dword_6E0090, pGameLib + 0x6E0090);
-    SET_TO(dword_6E0094, pGameLib + 0x6E0094);
+    SET_TO(OnRestoreDefaultsFn,         aml->GetSym(pGameHandle, "_ZN12SelectScreen17OnRestoreDefaultsEPS_i"));
+    SET_TO(OnRestoreDefaultsAudioFn,    aml->GetSym(pGameHandle, "_ZN11AudioScreen17OnRestoreDefaultsEP12SelectScreeni"));
+    SET_TO(GetTextureFromDB,            aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
+    SET_TO(ProcessMenuPending,          aml->GetSym(pGameHandle, "_ZN10MobileMenu14ProcessPendingEv"));
+    SET_TO(InitializeMenuPtr,           aml->GetSym(pGameHandle, "_ZN16CharSelectScreenC2EPKcb"));
+    SET_TO(LoadTextureDB,               aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime4LoadEPKcb21TextureDatabaseFormat"));
+    SET_TO(RegisterTextureDB,           aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime8RegisterEPS_"));
+    SET_TO(CdStreamOpen,                aml->GetSym(pGameHandle, "_Z12CdStreamOpenPKcb"));
+    SET_TO(AddSettingsItemFn,           aml->GetSym(pGameHandle, "_ZN12SelectScreen7AddItemEPNS_13MenuSelectionE"));
+
+    SET_TO(pCurrentMenuPointer,         pGameLib + 0x6E0098);
+    SET_TO(dword_6E0090,                pGameLib + 0x6E0090);
+    SET_TO(dword_6E0094,                pGameLib + 0x6E0094);
+    SET_TO(gxtErrorString,              aml->GetSym(pGameHandle, "GxtErrorString"));
+    SET_TO(pgMobileMenu,                aml->GetSym(pGameHandle, "gMobileMenu"));
+
+    // Patch IMG limit
+    aml->Unprot(pGameLib + 0x676AC4, sizeof(void*));
+    *(uintptr_t*)(pGameLib + 0x676AC4) = (uintptr_t)pNewStreamingFiles;
+    aml->Unprot(pGameLib + 0x46BD78, sizeof(char));
+    *(unsigned char*)(pGameLib + 0x46BD78) = (unsigned char)MAX_IMG_ARCHIVES+2;
+    aml->Unprot(pGameLib + 0x46BFE4, sizeof(char));
+    *(unsigned char*)(pGameLib + 0x46BFE4) = (unsigned char)MAX_IMG_ARCHIVES+2;
+    Redirect(aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"), (uintptr_t)AddImageToListPatched);
 }
 void SAUtils::InitializeVCUtils()
 {
@@ -372,7 +437,7 @@ int SAUtils::AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initV
 
 int SAUtils::ValueOfSettingsItem(int settingId)
 {
-    if(settingId < MODS_SETTINGS_STARTING_FROM || settingId > nNextSettingNum) return 0;
+    if(settingId < 0 || settingId > nNextSettingNum) return 0;
     return pNewSettings[8 * settingId + 2];
 }
 
@@ -448,6 +513,34 @@ void SAUtils::AddButton(eTypeOfSettings typeOf, const char* name, OnButtonPresse
     pNew->nSavedVal = 0;
     pNew->nMaxVal = 0;
     gMoreSettings.push_back(pNew);
+}
+
+void SAUtils::AddTextureDB(const char* name, bool registerMe)
+{
+    if(!name || !name[0]) return;
+    AdditionalTexDB* pNew = new AdditionalTexDB;
+    pNew->szName = name;
+    pNew->bRegister = registerMe;
+    gMoreTexDBs.push_back(pNew);
+
+    if(g_bIsGameStartedAlready)
+    {
+        uintptr_t dbPtr = LoadTextureDB(name, false, 5);
+        if(dbPtr != 0 && registerMe) RegisterTextureDB(dbPtr);
+    }
+}
+
+int* SAUtils::GetSettingValuePointer(int settingId)
+{
+    return &pNewSettings[8 * nNextSettingNum + 2];
+}
+
+void SAUtils::AddIMG(const char* imgName)
+{
+    if(!imgName || !imgName[0]) return;
+    gMoreIMGs.push_back(imgName);
+
+    if(g_bIsGameStartedAlready) AddImageToListPatched(imgName, false);
 }
 
 static SAUtils sautilsLocal;
