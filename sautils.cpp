@@ -4,7 +4,7 @@
 #include <sautils.h>
 #include <stdint.h>
 #include <vector>
-#include <cstring> // memcpy
+#include <cstring> // memcpy, memcmp
 
 #include "GTASA_STRUCTS.h"
 
@@ -32,7 +32,7 @@ void      (*InitializeMenuPtr)(uintptr_t mobileMenuPtr, const char* topname, boo
 uintptr_t (*LoadTextureDB)(const char* dbFile, bool fullLoad, int txdbFormat);
 void      (*RegisterTextureDB)(uintptr_t dbPtr);
 int       (*CdStreamOpen)(const char* filename, bool);
-int       AddImageToListPatched(const char* imgName, bool isPlayerImg = false);
+int       (*AddImageToList)(const char* imgName, bool isPlayerImg);
 
 /* GTASA Pointers */
 extern uintptr_t pGameLib;
@@ -97,7 +97,13 @@ DECL_HOOK(unsigned short*, AsciiToGxtChar, const char* txt, unsigned short* ret)
             AdditionalSetting* setting = gMoreSettings[i];
             if(setting->nSettingId == nCurrentSliderId)
             {
-                if(setting->fnOnValueDraw != NULL) return AsciiToGxtChar(setting->fnOnValueDraw(pNewSettings[8 * nCurrentSliderId + 2]), ret);
+                if(setting->fnOnValueDraw != NULL)
+                {
+                    int val = pNewSettings[8 * nCurrentSliderId + 2];
+                    nCurrentSliderId = 0;
+                    return AsciiToGxtChar(setting->fnOnValueDraw(val), ret);
+                }
+                nCurrentSliderId = 0;
                 break;
             }
         }
@@ -128,11 +134,12 @@ DECL_HOOK(void, SelectScreenOnDestroy, void* self)
     SettingsScreenClosed();
     SelectScreenOnDestroy(self);
 }
-DECL_HOOK(void, SelectScreenRender, uintptr_t self, float a1, float a2, float a3, float a4, float a5, float a6)
+DECL_HOOK(void, SettingSelectionRender, uintptr_t self, float a1, float a2, float a3, float a4, float a5, float a6)
 {
-    nCurrentSliderId = *(int*)(self + 8);
-    if(!(nCurrentSliderId >= MODS_SETTINGS_STARTING_FROM && nCurrentSliderId < MAX_SETTINGS && pNewSettings[8 * nCurrentSliderId + 7] == 1)) nCurrentSliderId = 0;
-    SelectScreenRender(self, a1, a2, a3, a4, a5, a6);
+    int sliderId = *(int*)(self + 8);
+    if(sliderId >= MODS_SETTINGS_STARTING_FROM && pNewSettings[8 * sliderId + 7] == 1) nCurrentSliderId = sliderId;
+    SettingSelectionRender(self, a1, a2, a3, a4, a5, a6);
+    nCurrentSliderId = 0;
 }
 DECL_HOOK(unsigned short*, GxtTextGet, void* self, const char* txt)
 {
@@ -245,13 +252,15 @@ DECL_HOOKv(InitialiseGame_SecondPass)
     auto vEnd = gMoreIMGs.end();
     while(vStart != vEnd)
     {
-        AddImageToListPatched(*vStart, false);
+        AddImageToList(*vStart, false);
+        logger->Info("Loaded IMG %s", *vStart);
         ++vStart;
     }
     g_bIsGameStartedAlready = true;
 }
 
 uintptr_t NewScreen_Controls_backto, NewScreen_Game_backto, NewScreen_Display_backto, NewScreen_Audio_backto;
+uintptr_t DrawSlider_backto;
 extern "C" void NewScreen_Controls_inject(void* self)
 {
     nCurrentItemTab = Controller;
@@ -314,6 +323,18 @@ DECL_HOOK(void*, NewScreen_Language, void* self)
     return self;
 }
 
+extern "C" void DrawSlider_inject(void* self)
+{
+    
+}
+__attribute__((optnone)) __attribute__((naked)) void DrawSlider_stub(void)
+{
+    asm("PUSH {R0}\nMOV R0, R4");
+    asm("BL DrawSlider_inject");
+    asm volatile("MOV R12, %0\n" :: "r"(DrawSlider_backto));
+    asm("POP {R0}\nBX R12");
+}
+
 int AddImageToListPatched(const char* imgName, bool isPlayerImg)
 {
     for(unsigned char i = 0; i < (MAX_IMG_ARCHIVES + 2); ++i)
@@ -332,6 +353,20 @@ int AddImageToListPatched(const char* imgName, bool isPlayerImg)
 
 void SAUtils::InitializeSAUtils()
 {
+    // Freak ya FLA and your sh*t
+    if(m_pHasFLA == 0 || !memcmp((void*)(aml->GetSym(pGameHandle, "_ZN10CStreaming13InitImageListEv") & ~0x1), (void*)"\xF0\xB5\x03\xAF\x4D\xF8", 6))
+    {
+        aml->Unprot(pGameLib + 0x676AC4, sizeof(void*));
+        *(uintptr_t*)(pGameLib + 0x676AC4) = (uintptr_t)pNewStreamingFiles;
+        aml->Unprot(pGameLib + 0x46BD78, sizeof(char));
+        *(unsigned char*)(pGameLib + 0x46BD78) = (unsigned char)MAX_IMG_ARCHIVES+2;
+        aml->Unprot(pGameLib + 0x46BFE4, sizeof(char));
+        *(unsigned char*)(pGameLib + 0x46BFE4) = (unsigned char)MAX_IMG_ARCHIVES+2;
+        Redirect(aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"), (uintptr_t)AddImageToListPatched);
+
+        logger->Info("IMG limit has been bumped!");
+    }
+
     // Bump settings limit
     aml->Unprot(pGameLib + 0x679A40, sizeof(void*));
     *(uintptr_t*)(pGameLib + 0x679A40) = (uintptr_t)pNewSettings;
@@ -340,7 +375,7 @@ void SAUtils::InitializeSAUtils()
     // Hook functions
     HOOKPLT(AsciiToGxtChar,             pGameLib + 0x6724F8);
     HOOKPLT(SelectScreenOnDestroy,      pGameLib + 0x673FD8);
-    HOOKPLT(SelectScreenRender,         pGameLib + 0x662850);
+    HOOKPLT(SettingSelectionRender,     pGameLib + 0x662850);
     HOOKPLT(GxtTextGet,                 pGameLib + 0x66E78C);
     HOOKPLT(SettingsScreen,             pGameLib + 0x674018);
     HOOKPLT(InitialiseRenderWare,       pGameLib + 0x66F2D0);
@@ -353,6 +388,10 @@ void SAUtils::InitializeSAUtils()
     Redirect(pGameLib + 0x2A4D3C + 0x1, (uintptr_t)NewScreen_Audio_stub); NewScreen_Audio_backto = pGameLib + 0x2A4D64 + 0x1;
     HOOKPLT(NewScreen_Language,         pGameLib + 0x675D90);
 
+    // Slider drawing hook
+    //Redirect(pGameLib + 0x299660 + 0x1, (uintptr_t)DrawSlider_stub); DrawSlider_backto = pGameLib + 0x29967C + 0x1;
+    //aml->Write(pGameLib + 0x29967C,     (uintptr_t)"\x0F\xA9", 2);
+
     SET_TO(OnRestoreDefaultsFn,         aml->GetSym(pGameHandle, "_ZN12SelectScreen17OnRestoreDefaultsEPS_i"));
     SET_TO(OnRestoreDefaultsAudioFn,    aml->GetSym(pGameHandle, "_ZN11AudioScreen17OnRestoreDefaultsEP12SelectScreeni"));
     SET_TO(GetTextureFromDB,            aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
@@ -362,21 +401,13 @@ void SAUtils::InitializeSAUtils()
     SET_TO(RegisterTextureDB,           aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime8RegisterEPS_"));
     SET_TO(CdStreamOpen,                aml->GetSym(pGameHandle, "_Z12CdStreamOpenPKcb"));
     SET_TO(AddSettingsItemFn,           aml->GetSym(pGameHandle, "_ZN12SelectScreen7AddItemEPNS_13MenuSelectionE"));
+    SET_TO(AddImageToList,              aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"));
 
     SET_TO(pCurrentMenuPointer,         pGameLib + 0x6E0098);
     SET_TO(dword_6E0090,                pGameLib + 0x6E0090);
     SET_TO(dword_6E0094,                pGameLib + 0x6E0094);
     SET_TO(gxtErrorString,              aml->GetSym(pGameHandle, "GxtErrorString"));
     SET_TO(pgMobileMenu,                aml->GetSym(pGameHandle, "gMobileMenu"));
-
-    // Patch IMG limit
-    aml->Unprot(pGameLib + 0x676AC4, sizeof(void*));
-    *(uintptr_t*)(pGameLib + 0x676AC4) = (uintptr_t)pNewStreamingFiles;
-    aml->Unprot(pGameLib + 0x46BD78, sizeof(char));
-    *(unsigned char*)(pGameLib + 0x46BD78) = (unsigned char)MAX_IMG_ARCHIVES+2;
-    aml->Unprot(pGameLib + 0x46BFE4, sizeof(char));
-    *(unsigned char*)(pGameLib + 0x46BFE4) = (unsigned char)MAX_IMG_ARCHIVES+2;
-    Redirect(aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"), (uintptr_t)AddImageToListPatched);
 }
 void SAUtils::InitializeVCUtils()
 {
@@ -540,7 +571,7 @@ void SAUtils::AddIMG(const char* imgName)
     if(!imgName || !imgName[0]) return;
     gMoreIMGs.push_back(imgName);
 
-    if(g_bIsGameStartedAlready) AddImageToListPatched(imgName, false);
+    if(g_bIsGameStartedAlready) AddImageToList(imgName, false);
 }
 
 static SAUtils sautilsLocal;

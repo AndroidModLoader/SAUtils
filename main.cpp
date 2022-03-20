@@ -6,7 +6,7 @@
 #include <sautils.h>
 
 /* Same name but can be used for VC too! (!!!not working currently!!!) */
-MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.2.0, RusJJ)
+MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.2.1, RusJJ)
 //NEEDGAME(com.rockstargames.gtasa)
 
 uintptr_t pGameLib = 0;
@@ -42,6 +42,7 @@ extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering
     logger->SetTag("SAUtils");
     pGameLib = aml->GetLib("libGTASA.so");
     pGameHandle = dlopen("libGTASA.so", RTLD_LAZY);
+    ((SAUtils*)sautils)->m_pHasFLA = aml->GetLib("libplugin_fastman92limitAdjuster_ANDROID_ARM32.so");
     if(pGameLib && pGameHandle)
     {
         ((SAUtils*)sautils)->m_eLoadedGame = GTASA_2_00;
@@ -62,8 +63,6 @@ extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering
             return;
         }
     }
-
-    ((SAUtils*)sautils)->m_pHasFLA = aml->GetLib("libplugin_fastman92limitAdjuster_ANDROID_ARM32.so");
     
     RegisterInterface("SAUtils", sautils);
 }

@@ -2,7 +2,7 @@
 
 #define MODS_SETTINGS_STARTING_FROM  37
 #define MAX_SETTINGS                 200
-#define MAX_IMG_ARCHIVES             16 // Def. is 6
+#define MAX_IMG_ARCHIVES             32 // Def. is 6
 
 enum eLoadedGame
 {
