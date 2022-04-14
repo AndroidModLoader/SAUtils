@@ -15,6 +15,7 @@ void Redirect(uintptr_t addr, uintptr_t to);
 std::vector<AdditionalSetting*> gMoreSettings;
 std::vector<AdditionalTexDB*>   gMoreTexDBs;
 std::vector<const char*>        gMoreIMGs;
+std::vector<SimpleFn>           gCreateWidgetFns;
 int nNextSettingNum = MODS_SETTINGS_STARTING_FROM - 1;
 int nCurrentSliderId = 0;
 eTypeOfSettings nCurrentItemTab = Mods;
@@ -22,6 +23,7 @@ bool g_bIsGameStartedAlready = false;
 
 /* Patches vars */
 int pNewSettings[8 * MAX_SETTINGS]; // A new char MobileSettings::settings[37*8*4]
+CWidget* pNewWidgets[MAX_WIDGETS] {NULL}, pWidgetsSaved[MAX_WIDGETS] {NULL};
 char pNewStreamingFiles[48 * (MAX_IMG_ARCHIVES + 2)]; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
 
 /* Funcs */
@@ -30,9 +32,32 @@ RwTexture* (*GetTextureFromDB)(const char*);
 uintptr_t (*ProcessMenuPending)(uintptr_t globalMobileMenuPtr);
 void      (*InitializeMenuPtr)(uintptr_t mobileMenuPtr, const char* topname, bool isCreatedNowMaybeIdk);
 uintptr_t (*LoadTextureDB)(const char* dbFile, bool fullLoad, int txdbFormat);
-void      (*RegisterTextureDB)(uintptr_t dbPtr);
+uintptr_t (*GetTexDB)(const char* dbName);
+void      (*RegisterTexDB)(uintptr_t dbPtr);
+void      (*UnregisterTexDB)(uintptr_t dbPtr);
 int       (*CdStreamOpen)(const char* filename, bool);
 int       (*AddImageToList)(const char* imgName, bool isPlayerImg);
+void      (*WidgetButton_Constructor)(CWidgetButton*, char const*, WidgetPosition const&, unsigned int, unsigned int, HIDMapping);
+void      (*SetSpriteTexture)(CSprite2d*, const char*);
+RwTexture*(*CopyRWTexture)(RwTexture*);
+void      (*RwTextureDestroy)(RwTexture*);
+void      (*ClearTapHistory)(CWidget*);
+bool      (*Widget_IsTouched)(CWidget*);
+bool      (*Widget_IsDoubleTapped)(CWidget*);
+bool      (*Widget_IsReleased)(CWidget*);
+bool      (*Widget_IsHeldDown)(CWidget*);
+bool      (*Widget_IsSwipedLeft)(CWidget*);
+bool      (*Widget_IsSwipedRight)(CWidget*);
+bool      (*Widget_IsSwipedUp)(CWidget*);
+bool      (*Widget_IsSwipedDown)(CWidget*);
+bool      (*Touch_IsWidgetTouched)(int widgetId, void* useless, int frames);
+bool      (*Touch_IsWidgetDoubleTapped)(int widgetId, bool doTapEffect, int frames);
+bool      (*Touch_IsWidgetReleased)(int widgetId, void* useless, int frames);
+bool      (*Touch_IsWidgetHeldDown)(int widgetId, void* useless, int frames);
+bool      (*Touch_IsWidgetSwipedLeft)(int widgetId, int frames);
+bool      (*Touch_IsWidgetSwipedRight)(int widgetId, int frames);
+bool      (*Touch_IsWidgetSwipedUp)(int widgetId, int frames);
+bool      (*Touch_IsWidgetSwipedDown)(int widgetId, int frames);
 
 /* GTASA Pointers */
 extern uintptr_t pGameLib;
@@ -45,6 +70,7 @@ uintptr_t pgMobileMenu;
 int* pCurrentMenuPointer;
 int* dword_6E0090; // Probably "YesOrNo" window is visible
 int* dword_6E0094;
+unsigned int* m_snTimeInMilliseconds;
 
 /* SAUtils */
 void AddRestoreDefaultsItem(void* screen, bool isAudio = false)
@@ -85,6 +111,21 @@ void AddSettingsToScreen(void* screen)
             }
         }
     }
+}
+
+DECL_HOOKv(CreateAllWidgets)
+{
+    CreateAllWidgets();
+    int size = gCreateWidgetFns.size();
+    for(int i = 0; i < size; ++i)
+    {
+        if(gCreateWidgetFns[i] != NULL) gCreateWidgetFns[i]();
+    }
+}
+DECL_HOOKv(WidgetButtonUpdate, CWidgetButton* self)
+{
+    if(self->enabled) return;
+    WidgetButtonUpdate(self);
 }
 
 DECL_HOOK(unsigned short*, AsciiToGxtChar, const char* txt, unsigned short* ret)
@@ -234,12 +275,11 @@ DECL_HOOKv(InitialiseRenderWare)
     auto vStart = gMoreTexDBs.begin();
     auto vEnd = gMoreTexDBs.end();
     AdditionalTexDB* tdb;
-    uintptr_t dbPtr;
     while(vStart != vEnd)
     {
         tdb = *vStart;
-        dbPtr = LoadTextureDB(tdb->szName, false, 5);
-        if(dbPtr != 0 && tdb->bRegister) RegisterTextureDB(dbPtr);
+        tdb->nDBPointer = LoadTextureDB(tdb->szName, false, 5);
+        if(tdb->nDBPointer != 0 && tdb->bRegister) RegisterTexDB(tdb->nDBPointer);
         ++vStart;
     }
 }
@@ -360,7 +400,7 @@ void SAUtils::InitializeSAUtils()
         *(uintptr_t*)(pGameLib + 0x676AC4) = (uintptr_t)pNewStreamingFiles;
         aml->Unprot(pGameLib + 0x46BD78, sizeof(char));
         *(unsigned char*)(pGameLib + 0x46BD78) = (unsigned char)MAX_IMG_ARCHIVES+2;
-        aml->Unprot(pGameLib + 0x46BFE4, sizeof(char));
+        aml->Unprot(pGameLib + 0x46BFE4, sizeof(char)); 
         *(unsigned char*)(pGameLib + 0x46BFE4) = (unsigned char)MAX_IMG_ARCHIVES+2;
         Redirect(aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"), (uintptr_t)AddImageToListPatched);
 
@@ -371,6 +411,24 @@ void SAUtils::InitializeSAUtils()
     aml->Unprot(pGameLib + 0x679A40, sizeof(void*));
     *(uintptr_t*)(pGameLib + 0x679A40) = (uintptr_t)pNewSettings;
     memcpy(pNewSettings, (int*)(pGameLib + 0x6E03F4), 1184);
+
+    // Bump widgets limit
+    aml->Unprot(pGameLib + 0x67947C, sizeof(void*)); *(uintptr_t*)(pGameLib + 0x67947C)     = (uintptr_t)pNewWidgets;
+    aml->Unprot(pGameLib + 0x2AE58E, sizeof(char));  *(unsigned char*)(pGameLib + 0x2AE58E) = (unsigned char)MAX_WIDGETS; // Create all
+    aml->Unprot(pGameLib + 0x2AFBC0, sizeof(char));  *(unsigned char*)(pGameLib + 0x2AFBC0) = (unsigned char)MAX_WIDGETS; // Delete all
+    aml->Unprot(pGameLib + 0x2B0B32, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0B32) = (unsigned char)MAX_WIDGETS; // Update
+    aml->Unprot(pGameLib + 0x2B0B50, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0B50) = (unsigned char)MAX_WIDGETS; // Update
+    aml->Unprot(pGameLib + 0x2B0C8C, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0C8C) = (unsigned char)MAX_WIDGETS-1; // Visualize all
+    aml->Unprot(pGameLib + 0x2B05B2, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B05B2) = (unsigned char)MAX_WIDGETS-1; // Clear
+    aml->Unprot(pGameLib + 0x2B0644, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0644) = (unsigned char)MAX_WIDGETS-1; // Clear
+    aml->Unprot(pGameLib + 0x2B0748, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0748) = (unsigned char)MAX_WIDGETS-1; // Clear
+    aml->Unprot(pGameLib + 0x2B0986, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0986) = (unsigned char)MAX_WIDGETS-1; // Clear
+    aml->Unprot(pGameLib + 0x2B07D2, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B07D2) = (unsigned char)MAX_WIDGETS; // Clear
+    aml->Unprot(pGameLib + 0x2B087E, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B087E) = (unsigned char)MAX_WIDGETS; // Clear
+    aml->Unprot(pGameLib + 0x2B0C34, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0C34) = (unsigned char)MAX_WIDGETS; // Draw All
+    aml->Unprot(pGameLib + 0x2B28E8, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B28E8) = (unsigned char)MAX_WIDGETS-1; // AnyWidgetsUsingAltBack
+    HOOKPLT(CreateAllWidgets, pGameLib + 0x6734E4);
+    //HOOK(WidgetButtonUpdate, aml->GetSym(pGameHandle, "_ZN13CWidgetButton6UpdateEv"));
 
     // Hook functions
     HOOKPLT(AsciiToGxtChar,             pGameLib + 0x6724F8);
@@ -398,16 +456,41 @@ void SAUtils::InitializeSAUtils()
     SET_TO(ProcessMenuPending,          aml->GetSym(pGameHandle, "_ZN10MobileMenu14ProcessPendingEv"));
     SET_TO(InitializeMenuPtr,           aml->GetSym(pGameHandle, "_ZN16CharSelectScreenC2EPKcb"));
     SET_TO(LoadTextureDB,               aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime4LoadEPKcb21TextureDatabaseFormat"));
-    SET_TO(RegisterTextureDB,           aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime8RegisterEPS_"));
+    SET_TO(GetTexDB,                    aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime11GetDatabaseEPKc"));
+    SET_TO(RegisterTexDB,               aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime8RegisterEPS_"));
+    SET_TO(UnregisterTexDB,             aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10UnregisterEPS_"));
     SET_TO(CdStreamOpen,                aml->GetSym(pGameHandle, "_Z12CdStreamOpenPKcb"));
     SET_TO(AddSettingsItemFn,           aml->GetSym(pGameHandle, "_ZN12SelectScreen7AddItemEPNS_13MenuSelectionE"));
     SET_TO(AddImageToList,              aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"));
+    SET_TO(WidgetButton_Constructor,    aml->GetSym(pGameHandle, "_ZN13CWidgetButtonC2EPKcRK14WidgetPositionjj10HIDMapping"));
+    SET_TO(SetSpriteTexture,            aml->GetSym(pGameHandle, "_ZN9CSprite2d10SetTextureEPc"));
+    SET_TO(CopyRWTexture,               aml->GetSym(pGameHandle, "_ZN15CClothesBuilder11CopyTextureEP9RwTexture"));
+    SET_TO(RwTextureDestroy,            aml->GetSym(pGameHandle, "_Z16RwTextureDestroyP9RwTexture"));
+    SET_TO(ClearTapHistory,             aml->GetSym(pGameHandle, "_ZN7CWidget15ClearTapHistoryEv"));
+    
+    SET_TO(Widget_IsTouched,            aml->GetSym(pGameHandle, "_ZN7CWidget9IsTouchedEP9CVector2D"));
+    SET_TO(Widget_IsDoubleTapped,       aml->GetSym(pGameHandle, "_ZN7CWidget14IsDoubleTappedEv"));
+    SET_TO(Widget_IsReleased,           aml->GetSym(pGameHandle, "_ZN7CWidget10IsReleasedEP9CVector2D"));
+    //SET_TO(Widget_IsHeldDown,           aml->GetSym(pGameHandle, "_ZN7CWidget10IsReleasedEP9CVector2D"));
+    SET_TO(Widget_IsSwipedLeft,         aml->GetSym(pGameHandle, "_ZN7CWidget12IsSwipedLeftEv"));
+    SET_TO(Widget_IsSwipedRight,        aml->GetSym(pGameHandle, "_ZN7CWidget13IsSwipedRightEv"));
+    SET_TO(Widget_IsSwipedUp,           aml->GetSym(pGameHandle, "_ZN7CWidget10IsSwipedUpEv"));
+    SET_TO(Widget_IsSwipedDown,         aml->GetSym(pGameHandle, "_ZN7CWidget12IsSwipedDownEv"));
+    SET_TO(Touch_IsWidgetTouched,       aml->GetSym(pGameHandle, "_ZN15CTouchInterface9IsTouchedENS_9WidgetIDsEP9CVector2Di"));
+    SET_TO(Touch_IsWidgetDoubleTapped,  aml->GetSym(pGameHandle, "_ZN15CTouchInterface14IsDoubleTappedENS_9WidgetIDsEbi"));
+    SET_TO(Touch_IsWidgetReleased,      aml->GetSym(pGameHandle, "_ZN15CTouchInterface10IsReleasedENS_9WidgetIDsEP9CVector2Di"));
+    //SET_TO(Touch_IsWidgetHeldDown,      aml->GetSym(pGameHandle, "_ZN7CWidget15ClearTapHistoryEv"));
+    SET_TO(Touch_IsWidgetSwipedLeft,    aml->GetSym(pGameHandle, "_ZN15CTouchInterface12IsSwipedLeftENS_9WidgetIDsEi"));
+    SET_TO(Touch_IsWidgetSwipedRight,   aml->GetSym(pGameHandle, "_ZN15CTouchInterface13IsSwipedRightENS_9WidgetIDsEi"));
+    SET_TO(Touch_IsWidgetSwipedUp,      aml->GetSym(pGameHandle, "_ZN15CTouchInterface10IsSwipedUpENS_9WidgetIDsEi"));
+    SET_TO(Touch_IsWidgetSwipedDown,    aml->GetSym(pGameHandle, "_ZN15CTouchInterface12IsSwipedDownENS_9WidgetIDsEi"));
 
     SET_TO(pCurrentMenuPointer,         pGameLib + 0x6E0098);
     SET_TO(dword_6E0090,                pGameLib + 0x6E0090);
     SET_TO(dword_6E0094,                pGameLib + 0x6E0094);
     SET_TO(gxtErrorString,              aml->GetSym(pGameHandle, "GxtErrorString"));
     SET_TO(pgMobileMenu,                aml->GetSym(pGameHandle, "gMobileMenu"));
+    SET_TO(m_snTimeInMilliseconds,      aml->GetSym(pGameHandle, "_ZN6CTimer22m_snTimeInMillisecondsE"));
 }
 void SAUtils::InitializeVCUtils()
 {
@@ -546,19 +629,21 @@ void SAUtils::AddButton(eTypeOfSettings typeOf, const char* name, OnButtonPresse
     gMoreSettings.push_back(pNew);
 }
 
-void SAUtils::AddTextureDB(const char* name, bool registerMe)
+uintptr_t* SAUtils::AddTextureDB(const char* name, bool registerMe)
 {
-    if(!name || !name[0]) return;
+    if(!name || !name[0]) return NULL;
     AdditionalTexDB* pNew = new AdditionalTexDB;
     pNew->szName = name;
     pNew->bRegister = registerMe;
+    pNew->nDBPointer = 0;
     gMoreTexDBs.push_back(pNew);
 
     if(g_bIsGameStartedAlready)
     {
-        uintptr_t dbPtr = LoadTextureDB(name, false, 5);
-        if(dbPtr != 0 && registerMe) RegisterTextureDB(dbPtr);
+        pNew->nDBPointer = LoadTextureDB(name, false, 5);
+        if(pNew->nDBPointer != 0 && registerMe) RegisterTexDB(pNew->nDBPointer);
     }
+    return &pNew->nDBPointer;
 }
 
 int* SAUtils::GetSettingValuePointer(int settingId)
@@ -572,6 +657,184 @@ void SAUtils::AddIMG(const char* imgName)
     gMoreIMGs.push_back(imgName);
 
     if(g_bIsGameStartedAlready) AddImageToList(imgName, false);
+}
+
+unsigned int SAUtils::GetCurrentMs()
+{
+    return *m_snTimeInMilliseconds;
+}
+
+uintptr_t SAUtils::GetTextureDB(const char* texDbName)
+{
+    return GetTexDB(texDbName);
+}
+
+void SAUtils::RegisterTextureDB(uintptr_t textureDbPtr)
+{
+    RegisterTexDB(textureDbPtr);
+}
+
+void SAUtils::UnregisterTextureDB(uintptr_t textureDbPtr)
+{
+    UnregisterTexDB(textureDbPtr);
+}
+
+uintptr_t SAUtils::GetTexture(const char* texName)
+{
+    return (uintptr_t)GetTextureFromDB(texName);
+}
+
+void SAUtils::AddOnWidgetsCreateListener(SimpleFn fn)
+{
+    gCreateWidgetFns.push_back(fn);
+}
+
+int SAUtils::FindFirstWidgetId()
+{
+    for(int i = MAX_WIDGETS_GAME; i < MAX_WIDGETS; ++i)
+    {
+        if(pNewWidgets[i] == NULL) return i;
+    }
+    return -1;
+}
+
+CWidgetButton* SAUtils::CreateWidget(int widgetId, int x, int y, float scale, const char* textureName)
+{
+    if(widgetId >= MAX_WIDGETS ||
+       widgetId < WIDGETID_MAX ||
+       pNewWidgets[widgetId] != NULL) return NULL;
+
+    CWidgetButton* widget = new CWidgetButton;
+    WidgetButton_Constructor(widget, textureName, WidgetPosition(x, y, scale), 1, 0, HIDMAP_NOTHING);
+    pNewWidgets[widgetId] = widget;
+
+    return widget;
+}
+
+int SAUtils::GetWidgetIndex(CWidgetButton* widget)
+{
+    for(int i = 0; i < MAX_WIDGETS; ++i)
+        if(pNewWidgets[i] == widget) return i;
+    return -1;
+}
+
+void SAUtils::SetWidgetIcon(CWidgetButton* widget, uintptr_t texturePtr)
+{
+    if(widget->widgetSprite != NULL)
+    {
+        RwTextureDestroy(widget->widgetSprite->m_pTexture);
+        widget->widgetSprite->m_pTexture = NULL;
+    }
+
+    if(texturePtr != 0)
+    {
+        RwTexture* org = (RwTexture*)texturePtr;
+        RwTexture* tex = CopyRWTexture(org);
+        tex->filterAddressing = org->filterAddressing;
+        widget->widgetSprite->m_pTexture = tex;
+    }
+}
+
+void SAUtils::SetWidgetIcon(CWidgetButton* widget, const char* textureName)
+{
+    SetSpriteTexture(widget->widgetSprite, textureName);
+}
+
+void SAUtils::SetWidgetIcon2(CWidgetButton* widget, uintptr_t texturePtr)
+{
+    if(widget->additionalSprite != NULL)
+    {
+        RwTextureDestroy(widget->additionalSprite->m_pTexture);
+        widget->additionalSprite->m_pTexture = NULL;
+    }
+
+    if(texturePtr != 0)
+    {
+        RwTexture* org = (RwTexture*)texturePtr;
+        RwTexture* tex = CopyRWTexture(org);
+        tex->filterAddressing = org->filterAddressing;
+        widget->additionalSprite->m_pTexture = tex;
+    }
+}
+
+void SAUtils::SetWidgetIcon2(CWidgetButton* widget, const char* textureName)
+{
+    SetSpriteTexture(widget->additionalSprite, textureName);
+}
+
+void SAUtils::ToggleWidget(CWidgetButton* widget, bool enable)
+{
+    widget->enabled = enable;
+}
+
+bool SAUtils::IsWidgetEnabled(CWidgetButton* widget)
+{
+    return widget->enabled;
+}
+
+void SAUtils::ClearWidgetTapHistory(CWidgetButton* widget)
+{
+    ClearTapHistory(widget);
+}
+
+bool SAUtils::GetWidgetState(CWidgetButton* widget, eWidgetPressState stateToGet)
+{
+    if(!widget->enabled) return false;
+    switch(stateToGet)
+    {
+        default: return false;
+
+        case WState_Touched:
+            return Widget_IsTouched(widget);
+
+        case WState_Released:
+            return Widget_IsReleased(widget);
+
+        case WState_DoubleTapped:
+            return Widget_IsDoubleTapped(widget);
+
+        case WState_SwipedLeft:
+            return Widget_IsSwipedLeft(widget);
+
+        case WState_SwipedRight:
+            return Widget_IsSwipedRight(widget);
+
+        case WState_SwipedUp:
+            return Widget_IsSwipedUp(widget);
+
+        case WState_SwipedDown:
+            return Widget_IsSwipedDown(widget);
+    }
+}
+
+bool SAUtils::GetWidgetState(int widgetId, eWidgetPressState stateToGet, bool doDoubleTapEff, int frames)
+{
+    if(!pNewWidgets[widgetId]->enabled) return false;
+    switch(stateToGet)
+    {
+        default: return false;
+
+        case WState_Touched:
+            return Touch_IsWidgetTouched(widgetId, NULL, frames);
+
+        case WState_Released:
+            return Touch_IsWidgetReleased(widgetId, NULL, frames);
+
+        case WState_DoubleTapped:
+            return Touch_IsWidgetDoubleTapped(widgetId, doDoubleTapEff, frames);
+
+        case WState_SwipedLeft:
+            return Touch_IsWidgetSwipedLeft(widgetId, frames);
+
+        case WState_SwipedRight:
+            return Touch_IsWidgetSwipedRight(widgetId, frames);
+
+        case WState_SwipedUp:
+            return Touch_IsWidgetSwipedUp(widgetId, frames);
+
+        case WState_SwipedDown:
+            return Touch_IsWidgetSwipedDown(widgetId, frames);
+    }
 }
 
 static SAUtils sautilsLocal;

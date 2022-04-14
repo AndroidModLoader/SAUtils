@@ -6,7 +6,7 @@
 #include <sautils.h>
 
 /* Same name but can be used for VC too! (!!!not working currently!!!) */
-MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.2.1, RusJJ)
+MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.3.0, RusJJ)
 //NEEDGAME(com.rockstargames.gtasa)
 
 uintptr_t pGameLib = 0;
@@ -15,6 +15,7 @@ void* pGameHandle = NULL;
 void Redirect(uintptr_t addr, uintptr_t to)
 {
     if(!addr) return;
+    uint32_t hook[2] = {0xE51FF004, to};
     if(addr & 1)
     {
         addr &= ~1;
@@ -23,18 +24,9 @@ void Redirect(uintptr_t addr, uintptr_t to)
             aml->PlaceNOP(addr, 1);
             addr += 2;
         }
-        uint32_t hook[2];
         hook[0] = 0xF000F8DF;
-        hook[1] = to;
-        aml->Write(addr, (uintptr_t)hook, sizeof(hook));
     }
-    else
-    {
-        uint32_t hook[2];
-        hook[0] = 0xE51FF004;
-        hook[1] = to;
-        aml->Write(addr, (uintptr_t)hook, sizeof(hook));
-    }
+    aml->Write(addr, (uintptr_t)hook, sizeof(hook));
 }
 
 extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering

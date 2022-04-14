@@ -2,7 +2,6 @@
 
 #define MODS_SETTINGS_STARTING_FROM  37
 #define MAX_SETTINGS                 200
-#define MAX_IMG_ARCHIVES             32 // Def. is 6
 
 enum eLoadedGame
 {
@@ -31,6 +30,7 @@ struct AdditionalTexDB
 {
     const char*        szName;
     bool               bRegister;
+    uintptr_t          nDBPointer;
 };
 
 struct ButtonSettingItem
@@ -58,25 +58,45 @@ class SAUtils : public ISAUtils
 public:
     SAUtils() : m_eLoadedGame(Unknown) {}
 
-    void        InitializeSAUtils();
-    void        InitializeVCUtils();
+    void            InitializeSAUtils();
+    void            InitializeVCUtils();
 
-    uintptr_t   IsFLALoaded();
-    int         AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, bool isSlider = false, void* switchesArray = NULL);
-    int         ValueOfSettingsItem(int settingId);
+    uintptr_t       IsFLALoaded();
+    int             AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, bool isSlider = false, void* switchesArray = NULL);
+    int             ValueOfSettingsItem(int settingId);
 
     // 1.1
-    int         AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, const char** switchesArray = NULL, OnSettingChangedFn fnOnValueChange = NULL);
-    int         AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, OnSettingDrawedFn fnOnValueDraw = NULL);
+    int             AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, const char** switchesArray = NULL, OnSettingChangedFn fnOnValueChange = NULL);
+    int             AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, OnSettingDrawedFn fnOnValueDraw = NULL);
 
     // 1.2  
-    void        AddButton(eTypeOfSettings typeOf, const char* name, OnButtonPressedFn fnOnButtonPressed = NULL);
-    void        AddTextureDB(const char* name, bool registerMe = false);
-    int*        GetSettingValuePointer(int settingId);
-    void        AddIMG(const char* imgName);
+    void            AddButton(eTypeOfSettings typeOf, const char* name, OnButtonPressedFn fnOnButtonPressed = NULL);
+    uintptr_t*      AddTextureDB(const char* name, bool registerMe = false);
+    int*            GetSettingValuePointer(int settingId);
+    void            AddIMG(const char* imgName);
+
+    // 1.3
+    unsigned int    GetCurrentMs();
+    uintptr_t       GetTextureDB(const char* texDbName);
+    void            RegisterTextureDB(uintptr_t textureDbPtr);
+    void            UnregisterTextureDB(uintptr_t textureDbPtr);
+    uintptr_t       GetTexture(const char* texName);
+    void            AddOnWidgetsCreateListener(SimpleFn fn);
+    int             FindFirstWidgetId();
+    CWidgetButton*  CreateWidget(int widgetId, int x, int y, float scale, const char* textureName);
+    int             GetWidgetIndex(CWidgetButton* widget);
+    void            SetWidgetIcon(CWidgetButton* widget, uintptr_t texturePtr);
+    void            SetWidgetIcon(CWidgetButton* widget, const char* textureName);
+    void            SetWidgetIcon2(CWidgetButton* widget, uintptr_t texturePtr);
+    void            SetWidgetIcon2(CWidgetButton* widget, const char* textureName);
+    void            ToggleWidget(CWidgetButton* widget, bool enable);
+    bool            IsWidgetEnabled(CWidgetButton* widget);
+    void            ClearWidgetTapHistory(CWidgetButton* widget);
+    bool            GetWidgetState(CWidgetButton* widget, eWidgetPressState stateToGet);
+    bool            GetWidgetState(int widgetId, eWidgetPressState stateToGet, bool doDoubleTapEff = true, int frames = 1);
 
 public:
-    eLoadedGame m_eLoadedGame;
-    uintptr_t   m_pHasFLA;
+    eLoadedGame     m_eLoadedGame;
+    uintptr_t       m_pHasFLA;
 };
-extern ISAUtils* sautils;
+extern ISAUtils*    sautils;

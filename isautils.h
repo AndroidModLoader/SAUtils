@@ -2,10 +2,14 @@
 
 typedef void        (*OnSettingChangedFn)(int nOldValue, int nNewValue);
 typedef const char* (*OnSettingDrawedFn) (int nNewValue);
-typedef void        (*OnButtonPressedFn) (uintptr_t screen); // Screen is just a pointer of SelectScreen if you need it...
+typedef void        (*OnButtonPressedFn) (uintptr_t screen); // "screen" is just a pointer of SelectScreen if you need it...
+typedef void        (*SimpleFn)();
 
-// Unknown
-// 2
+#define MAX_IMG_ARCHIVES                    32 // Def. is 6
+
+#define MAX_WIDGETS_GAME                    190
+#define MAX_WIDGETS                         0xFF
+class CWidgetButton;
 
 // Controllers
 #define SETITEM_SA_TOUCH_LAYOUT             9
@@ -56,7 +60,7 @@ enum eTypeOfSettings : unsigned char
     Language = 4,
     Mods = 5,
 
-    SETTINGS_COUNT,
+    SETTINGS_COUNT
 };
 
 enum eTypeOfItem : unsigned char
@@ -65,7 +69,21 @@ enum eTypeOfItem : unsigned char
     Slider = 1,
     Button = 2,
 
-    ITEMTYPES_COUNT,
+    ITEMTYPES_COUNT
+};
+
+enum eWidgetPressState : unsigned char
+{
+    WState_Touched = 0,
+    WState_DoubleTapped,
+    WState_Released,
+    WState_HeldDown,
+    WState_SwipedLeft,
+    WState_SwipedRight,
+    WState_SwipedUp,
+    WState_SwipedDown,
+
+    WIDGETSTATE_MAX
 };
 
 class ISAUtils
@@ -136,8 +154,9 @@ public:
      *
      *  \param name Obviously a name of texdb
      *  \param registerMe Should this texdb be registered for searching in or just be loaded until we register it manually?
+     *  \return Pointer of value that contains loaded TexDB address (since SAUtils v1.3)
      */
-    virtual void AddTextureDB(const char* name, bool registerMe = false) = 0;
+    virtual uintptr_t* AddTextureDB(const char* name, bool registerMe = false) = 0;
 
     /** Returns a pointer to setting value
      *
@@ -151,4 +170,136 @@ public:
      *  \param imgName IMG archive name
      */
     virtual void AddIMG(const char* imgName) = 0;
+
+
+/* Functions below added in 1.3.0.0 */
+
+    /** Get current game time in milliseconds
+     *
+     *  \return Current milliseconds
+     */
+    virtual unsigned int GetCurrentMs() = 0;
+
+    /** Get pointer of already loaded texture database
+     *
+     *  \param texDbName Name of the textureDb
+     *  \return Texture Database pointer
+     */
+    virtual uintptr_t GetTextureDB(const char* texDbName) = 0;
+
+    /** Registers Texture Database for texture lookup (you SHOULD unregister it later!!!)
+     *
+     *  \param textureDbPtr Texture Database pointer, obviously.
+     */
+    virtual void RegisterTextureDB(uintptr_t textureDbPtr) = 0;
+    
+    /** Unregisters Texture Database for texture lookup
+     *
+     *  \param textureDbPtr Texture Database pointer, obviously.
+     */
+    virtual void UnregisterTextureDB(uintptr_t textureDbPtr) = 0;
+    
+    /** Get a RwTexture* (as a uintptr_t) from REGISTERED texture databases
+     *
+     *  \param texName Texture name
+     *  \return Texture pointer (RwTexture*)
+     */
+    virtual uintptr_t GetTexture(const char* texName) = 0;
+
+    /** Add a listener of "Create All Widgets"
+     *
+     *  \param fn A function that will be called when Widgets should be added
+     */
+    virtual void AddOnWidgetsCreateListener(SimpleFn fn) = 0;
+
+    /** Find a first widget id that can be occupied (free now)
+     *
+     *  \return Free widget id (-1 if no empty space)
+     */
+    virtual int FindFirstWidgetId() = 0;
+
+    /** Creates a widget
+     *
+     *  \param widgetId An id of the widget
+     *  \param x X coord on screen
+     *  \param y Y coord on screen
+     *  \param scale Scale of a widget
+     *  \param textureName Initial texture for a widget (may be NULL to be invisible)
+     *  \return Pointer of the widget (returns NULL if id is wrong or already taken)
+     */
+    virtual CWidgetButton* CreateWidget(int widgetId, int x, int y, float scale, const char* textureName = NULL) = 0;
+
+    /** Get widget index (uses a loop)
+     *
+     *  \param widget A pointer of the widget
+     *  \return Index
+     */
+    virtual int GetWidgetIndex(CWidgetButton* widget) = 0;
+
+    /** Sets widget icon
+     *
+     *  \param widget A pointer of the widget
+     *  \param texturePtr A pointer of the texture
+     */
+    virtual void SetWidgetIcon(CWidgetButton* widget, uintptr_t texturePtr) = 0;
+
+    /** Sets widget icon
+     *
+     *  \param widget A pointer of the widget
+     *  \param textureName A name of the texture
+     */
+    virtual void SetWidgetIcon(CWidgetButton* widget, const char* textureName) = 0;
+
+    /** Sets widget icon (second one)
+     *
+     *  \param widget A pointer of the widget
+     *  \param texturePtr A pointer of the texture
+     */
+    virtual void SetWidgetIcon2(CWidgetButton* widget, uintptr_t texturePtr) = 0;
+
+    /** Sets widget icon (second one)
+     *
+     *  \param widget A pointer of the widget
+     *  \param textureName A name of the texture
+     */
+    virtual void SetWidgetIcon2(CWidgetButton* widget, const char* textureName) = 0;
+
+    /** Enable or disable widget
+     *
+     *  \param widget A pointer of the widget
+     *  \param enable Enable? (default: true)
+     */
+    virtual void ToggleWidget(CWidgetButton* widget, bool enable = true) = 0;
+
+    /** Is our widget enabled
+     *
+     *  \param widget A pointer of the widget
+     *  \return True if enabled
+     */
+    virtual bool IsWidgetEnabled(CWidgetButton* widget) = 0;
+
+    /** Clear widget's tap history
+     *
+     *  \param widget A pointer of the widget
+     */
+    virtual void ClearWidgetTapHistory(CWidgetButton* widget) = 0;
+
+    /** Gets widget state (is double tapped &etc)
+     *
+     *  \param widget A pointer of the widget
+     *  \param stateToGet See eWidgetPressState
+     *  \return True if state "enabled"
+     */
+    virtual bool GetWidgetState(CWidgetButton* widget, eWidgetPressState stateToGet) = 0;
+
+    /** Gets widget state (is double tapped &etc).
+     * This variation allows us to set frames (idk why you need to) and enable DoubleTap Effect
+     *
+     *  \param widget A pointer of the widget
+     *  \param stateToGet See eWidgetPressState
+     *  \param doDoubleTapEff Do double tap effect if stateToGet==WState_DoubleTapped
+     *  \param frames Frames count (do not ask me, still did not understand)
+     *  \return True if state "enabled"
+     */
+    virtual bool GetWidgetState(int widgetId, eWidgetPressState stateToGet, bool doDoubleTapEff = true, int frames = 1) = 0;
 };
