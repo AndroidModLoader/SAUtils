@@ -713,7 +713,7 @@ CWidgetButton* SAUtils::CreateWidget(int widgetId, int x, int y, float scale, co
 
 int SAUtils::GetWidgetIndex(CWidgetButton* widget)
 {
-    for(int i = 0; i < MAX_WIDGETS; ++i)
+    for(int i = MAX_WIDGETS_GAME; i < MAX_WIDGETS; ++i)
         if(pNewWidgets[i] == widget) return i;
     return -1;
 }
@@ -767,9 +767,9 @@ void SAUtils::ToggleWidget(CWidgetButton* widget, bool enable)
     widget->enabled = enable;
 }
 
-bool SAUtils::IsWidgetEnabled(CWidgetButton* widget)
+bool SAUtils::IsWidgetEnabled(int widgetId)
 {
-    return widget->enabled;
+    return pNewWidgets[widgetId]->enabled;
 }
 
 void SAUtils::ClearWidgetTapHistory(CWidgetButton* widget)
@@ -777,7 +777,7 @@ void SAUtils::ClearWidgetTapHistory(CWidgetButton* widget)
     ClearTapHistory(widget);
 }
 
-bool SAUtils::GetWidgetState(CWidgetButton* widget, eWidgetPressState stateToGet)
+int SAUtils::GetWidgetState(CWidgetButton* widget, eWidgetState stateToGet)
 {
     if(!widget->enabled) return false;
     switch(stateToGet)
@@ -807,7 +807,7 @@ bool SAUtils::GetWidgetState(CWidgetButton* widget, eWidgetPressState stateToGet
     }
 }
 
-bool SAUtils::GetWidgetState(int widgetId, eWidgetPressState stateToGet, bool doDoubleTapEff, int frames)
+int SAUtils::GetWidgetState(int widgetId, eWidgetState stateToGet, bool doDoubleTapEff, int frames)
 {
     if(!pNewWidgets[widgetId]->enabled) return false;
     switch(stateToGet)
@@ -835,6 +835,23 @@ bool SAUtils::GetWidgetState(int widgetId, eWidgetPressState stateToGet, bool do
         case WState_SwipedDown:
             return Touch_IsWidgetSwipedDown(widgetId, frames);
     }
+}
+
+void SAUtils::GetWidgetPos(int widgetId, float* x, float* y, float* sx, float* sy)
+{
+    WidgetPosition& p  = pNewWidgets[widgetId]->posScale;
+    if(x != NULL)  *x  = p.pos.x;
+    if(y != NULL)  *y  = p.pos.y;
+    if(sx != NULL) *sx = p.scale.x;
+    if(sy != NULL) *sy = p.scale.y;
+}
+
+void SAUtils::SetWidgetPos(int widgetId, float x, float y, float sx, float sy)
+{
+    if(widgetId >= MAX_WIDGETS || widgetId < WIDGETID_MAX) return;
+    WidgetPosition& p = pNewWidgets[widgetId]->posScale;
+    p.pos.x = x;    p.pos.y = y;
+    p.scale.x = sx; p.scale.y = sy;
 }
 
 static SAUtils sautilsLocal;

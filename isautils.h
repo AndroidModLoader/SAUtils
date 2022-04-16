@@ -72,7 +72,7 @@ enum eTypeOfItem : unsigned char
     ITEMTYPES_COUNT
 };
 
-enum eWidgetPressState : unsigned char
+enum eWidgetState : unsigned char
 {
     WState_Touched = 0,
     WState_DoubleTapped,
@@ -273,10 +273,17 @@ public:
 
     /** Is our widget enabled
      *
+     *  \param widgetId An id of the widget
+     *  \return True if enabled
+     */
+    virtual bool IsWidgetEnabled(int widgetId) = 0;
+
+    /** Is our widget enabled
+     *
      *  \param widget A pointer of the widget
      *  \return True if enabled
      */
-    virtual bool IsWidgetEnabled(CWidgetButton* widget) = 0;
+    inline bool IsWidgetEnabled(CWidgetButton* widget) { return *(bool*)((int)widget + 77); };
 
     /** Clear widget's tap history
      *
@@ -288,9 +295,9 @@ public:
      *
      *  \param widget A pointer of the widget
      *  \param stateToGet See eWidgetPressState
-     *  \return True if state "enabled"
+     *  \return State value
      */
-    virtual bool GetWidgetState(CWidgetButton* widget, eWidgetPressState stateToGet) = 0;
+    virtual int GetWidgetState(CWidgetButton* widget, eWidgetState stateToGet) = 0;
 
     /** Gets widget state (is double tapped &etc).
      * This variation allows us to set frames (idk why you need to) and enable DoubleTap Effect
@@ -299,7 +306,27 @@ public:
      *  \param stateToGet See eWidgetPressState
      *  \param doDoubleTapEff Do double tap effect if stateToGet==WState_DoubleTapped
      *  \param frames Frames count (do not ask me, still did not understand)
-     *  \return True if state "enabled"
+     *  \return State value
      */
-    virtual bool GetWidgetState(int widgetId, eWidgetPressState stateToGet, bool doDoubleTapEff = true, int frames = 1) = 0;
+    virtual int GetWidgetState(int widgetId, eWidgetState stateToGet, bool doDoubleTapEff = true, int frames = 1) = 0;
+
+    /** Gives us a pos or scale of a widget with the given id
+     *
+     *  \param widgetId An id of the widget
+     *  \param x A pointer where to save X coord
+     *  \param y A pointer where to save Y coord
+     *  \param sx A pointer where to save X scale
+     *  \param sy A pointer where to save Y scale
+     */
+    virtual void GetWidgetPos(int widgetId, float* x = NULL, float* y = NULL, float* sx = NULL, float* sy = NULL) = 0;
+
+    /** Gives us a pos or scale of a widget with the given id
+     *
+     *  \param widgetId An id of the widget
+     *  \param x X coord
+     *  \param y Y coord
+     *  \param sx Scale X
+     *  \param sy Scale Y
+     */
+    virtual void SetWidgetPos(int widgetId, float x, float y, float sx, float sy);
 };

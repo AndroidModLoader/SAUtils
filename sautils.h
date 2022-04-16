@@ -90,10 +90,12 @@ public:
     void            SetWidgetIcon2(CWidgetButton* widget, uintptr_t texturePtr);
     void            SetWidgetIcon2(CWidgetButton* widget, const char* textureName);
     void            ToggleWidget(CWidgetButton* widget, bool enable);
-    bool            IsWidgetEnabled(CWidgetButton* widget);
+    bool            IsWidgetEnabled(int widgetId);
     void            ClearWidgetTapHistory(CWidgetButton* widget);
-    bool            GetWidgetState(CWidgetButton* widget, eWidgetPressState stateToGet);
-    bool            GetWidgetState(int widgetId, eWidgetPressState stateToGet, bool doDoubleTapEff = true, int frames = 1);
+    int             GetWidgetState(CWidgetButton* widget, eWidgetState stateToGet);
+    int             GetWidgetState(int widgetId, eWidgetState stateToGet, bool doDoubleTapEff = true, int frames = 1);
+    void            GetWidgetPos(int widgetId, float* x = NULL, float* y = NULL, float* sx = NULL, float* sy = NULL);
+    void            SetWidgetPos(int widgetId, float x, float y, float sx, float sy);
 
 public:
     eLoadedGame     m_eLoadedGame;
