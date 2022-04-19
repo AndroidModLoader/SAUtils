@@ -1,8 +1,12 @@
+#ifndef _SAUTILS_INTERFACE
+#define _SAUTILS_INTERFACE
+
 #include <stdint.h>
 
 typedef void        (*OnSettingChangedFn)(int nOldValue, int nNewValue);
 typedef const char* (*OnSettingDrawedFn) (int nNewValue);
 typedef void        (*OnButtonPressedFn) (uintptr_t screen); // "screen" is just a pointer of SelectScreen if you need it...
+typedef void        (*OnPlayerProcessFn) (uintptr_t info); // "info" is a pointer of CPlayerInfo
 typedef void        (*SimpleFn)();
 
 #define MAX_IMG_ARCHIVES                    32 // Def. is 6
@@ -180,6 +184,12 @@ public:
      */
     virtual unsigned int GetCurrentMs() = 0;
 
+    /** Get current game frames per second
+     *
+     *  \return Current FPS
+     */
+    virtual float GetCurrentFPS() = 0;
+
     /** Get pointer of already loaded texture database
      *
      *  \param texDbName Name of the textureDb
@@ -208,15 +218,21 @@ public:
 
     /** Add a listener of "Create All Widgets"
      *
-     *  \param fn A function that will be called when Widgets should be added
+     *  \param fn A function that will be called when Widgets are added
      */
     virtual void AddOnWidgetsCreateListener(SimpleFn fn) = 0;
+
+    /** Add a listener of "On player updated"
+     *
+     *  \param fn A function that will be called when local player is updated
+     */
+    virtual void AddPlayerUpdateListener(OnPlayerProcessFn fn, bool post = true) = 0;
 
     /** Find a first widget id that can be occupied (free now)
      *
      *  \return Free widget id (-1 if no empty space)
      */
-    virtual int FindFirstWidgetId() = 0;
+    virtual int FindFreeWidgetId() = 0;
 
     /** Creates a widget
      *
@@ -287,6 +303,12 @@ public:
 
     /** Clear widget's tap history
      *
+     *  \param widgetId An id of the widget
+     */
+    virtual void ClearWidgetTapHistory(int widgetId) = 0;
+
+    /** Clear widget's tap history
+     *
      *  \param widget A pointer of the widget
      */
     virtual void ClearWidgetTapHistory(CWidgetButton* widget) = 0;
@@ -312,7 +334,7 @@ public:
 
     /** Gives us a pos or scale of a widget with the given id
      *
-     *  \param widgetId An id of the widget
+     *  \param widgetId An id of the widget (any widget id)
      *  \param x A pointer where to save X coord
      *  \param y A pointer where to save Y coord
      *  \param sx A pointer where to save X scale
@@ -322,7 +344,7 @@ public:
 
     /** Gives us a pos or scale of a widget with the given id
      *
-     *  \param widgetId An id of the widget
+     *  \param widgetId An id of the widget (only custom widgets id)
      *  \param x X coord
      *  \param y Y coord
      *  \param sx Scale X
@@ -330,3 +352,5 @@ public:
      */
     virtual void SetWidgetPos(int widgetId, float x, float y, float sx, float sy);
 };
+
+#endif // _SAUTILS_INTERFACE

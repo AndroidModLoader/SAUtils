@@ -9,68 +9,67 @@
 #include "GTASA_STRUCTS.h"
 
 MYMODDECL();
+extern uintptr_t pGameLib;
+extern void* pGameHandle;
 void Redirect(uintptr_t addr, uintptr_t to);
+
+/* Callbacks */
+std::vector<SimpleFn>           gCreateWidgetFns;
+std::vector<OnPlayerProcessFn>  gPlayerUpdateFns;
+std::vector<OnPlayerProcessFn>  gPlayerUpdatePostFns;
 
 /* Saves */
 std::vector<AdditionalSetting*> gMoreSettings;
 std::vector<AdditionalTexDB*>   gMoreTexDBs;
 std::vector<const char*>        gMoreIMGs;
-std::vector<SimpleFn>           gCreateWidgetFns;
 int nNextSettingNum = MODS_SETTINGS_STARTING_FROM - 1;
 int nCurrentSliderId = 0;
 eTypeOfSettings nCurrentItemTab = Mods;
 bool g_bIsGameStartedAlready = false;
 
-/* Patches vars */
-int pNewSettings[8 * MAX_SETTINGS]; // A new char MobileSettings::settings[37*8*4]
-CWidget* pNewWidgets[MAX_WIDGETS] {NULL}, pWidgetsSaved[MAX_WIDGETS] {NULL};
-char pNewStreamingFiles[48 * (MAX_IMG_ARCHIVES + 2)]; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
+/* Patched vars */
+int      pNewSettings[8 * MAX_SETTINGS] {0}; // A new char MobileSettings::settings[37*8*4]
+CWidget* pNewWidgets[MAX_WIDGETS] {NULL};
+char     pNewStreamingFiles[48 * (MAX_IMG_ARCHIVES + 2)] {0}; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
 
 /* Funcs */
 typedef void* (*SettingsAddItemFn)(void* a1, uintptr_t a2);
-RwTexture* (*GetTextureFromDB)(const char*);
-uintptr_t (*ProcessMenuPending)(uintptr_t globalMobileMenuPtr);
-void      (*InitializeMenuPtr)(uintptr_t mobileMenuPtr, const char* topname, bool isCreatedNowMaybeIdk);
-uintptr_t (*LoadTextureDB)(const char* dbFile, bool fullLoad, int txdbFormat);
-uintptr_t (*GetTexDB)(const char* dbName);
-void      (*RegisterTexDB)(uintptr_t dbPtr);
-void      (*UnregisterTexDB)(uintptr_t dbPtr);
-int       (*CdStreamOpen)(const char* filename, bool);
-int       (*AddImageToList)(const char* imgName, bool isPlayerImg);
-void      (*WidgetButton_Constructor)(CWidgetButton*, char const*, WidgetPosition const&, unsigned int, unsigned int, HIDMapping);
-void      (*SetSpriteTexture)(CSprite2d*, const char*);
-RwTexture*(*CopyRWTexture)(RwTexture*);
-void      (*RwTextureDestroy)(RwTexture*);
-void      (*ClearTapHistory)(CWidget*);
-bool      (*Widget_IsTouched)(CWidget*);
-bool      (*Widget_IsDoubleTapped)(CWidget*);
-bool      (*Widget_IsReleased)(CWidget*);
-bool      (*Widget_IsHeldDown)(CWidget*);
-bool      (*Widget_IsSwipedLeft)(CWidget*);
-bool      (*Widget_IsSwipedRight)(CWidget*);
-bool      (*Widget_IsSwipedUp)(CWidget*);
-bool      (*Widget_IsSwipedDown)(CWidget*);
-bool      (*Touch_IsWidgetTouched)(int widgetId, void* useless, int frames);
-bool      (*Touch_IsWidgetDoubleTapped)(int widgetId, bool doTapEffect, int frames);
-bool      (*Touch_IsWidgetReleased)(int widgetId, void* useless, int frames);
-bool      (*Touch_IsWidgetHeldDown)(int widgetId, void* useless, int frames);
-bool      (*Touch_IsWidgetSwipedLeft)(int widgetId, int frames);
-bool      (*Touch_IsWidgetSwipedRight)(int widgetId, int frames);
-bool      (*Touch_IsWidgetSwipedUp)(int widgetId, int frames);
-bool      (*Touch_IsWidgetSwipedDown)(int widgetId, int frames);
+RwTexture*    (*GetTextureFromDB)(const char*);
+uintptr_t     (*ProcessMenuPending)(MobileMenu* mobilemenu);
+void          (*InitializeMenuPtr)(uintptr_t mobileMenuPtr, const char* topname, bool isCreatedNowMaybeIdk);
+uintptr_t     (*LoadTextureDB)(const char* dbFile, bool fullLoad, int txdbFormat);
+uintptr_t     (*GetTexDB)(const char* dbName);
+void          (*RegisterTexDB)(uintptr_t dbPtr);
+void          (*UnregisterTexDB)(uintptr_t dbPtr);
+int           (*CdStreamOpen)(const char* filename, bool);
+int           (*AddImageToList)(const char* imgName, bool isPlayerImg);
+void          (*WidgetButton_Constructor)(CWidgetButton*, char const*, WidgetPosition const&, unsigned int, unsigned int, HIDMapping);
+void          (*SetSpriteTexture)(CSprite2d*, const char*);
+RwTexture*    (*CopyRWTexture)(RwTexture*);
+void          (*RwTextureDestroy)(RwTexture*);
+bool          (*Widget_IsTouched)(CWidget*);
+bool          (*Widget_IsDoubleTapped)(CWidget*);
+bool          (*Widget_IsReleased)(CWidget*);
+bool          (*Widget_IsSwipedLeft)(CWidget*);
+bool          (*Widget_IsSwipedRight)(CWidget*);
+bool          (*Widget_IsSwipedUp)(CWidget*);
+bool          (*Widget_IsSwipedDown)(CWidget*);
+bool          (*Touch_IsWidgetTouched)(int widgetId, void* useless, int frames);
+bool          (*Touch_IsWidgetDoubleTapped)(int widgetId, bool doTapEffect, int frames);
+bool          (*Touch_IsWidgetReleased)(int widgetId, void* useless, int frames);
+bool          (*Touch_IsWidgetSwipedLeft)(int widgetId, int frames);
+bool          (*Touch_IsWidgetSwipedRight)(int widgetId, int frames);
+bool          (*Touch_IsWidgetSwipedUp)(int widgetId, int frames);
+bool          (*Touch_IsWidgetSwipedDown)(int widgetId, int frames);
 
 /* GTASA Pointers */
-extern uintptr_t pGameLib;
-extern void* pGameHandle;
-unsigned short* gxtErrorString;
 SettingsAddItemFn AddSettingsItemFn;
-uintptr_t OnRestoreDefaultsFn;
-uintptr_t OnRestoreDefaultsAudioFn;
-uintptr_t pgMobileMenu;
-int* pCurrentMenuPointer;
-int* dword_6E0090; // Probably "YesOrNo" window is visible
-int* dword_6E0094;
+MobileMenu *gMobileMenu;
+CPlayerInfo *WorldPlayers;
+unsigned short* gxtErrorString;
+uintptr_t OnRestoreDefaultsFn, OnRestoreDefaultsAudioFn;
 unsigned int* m_snTimeInMilliseconds;
+float* game_FPS;
 
 /* SAUtils */
 void AddRestoreDefaultsItem(void* screen, bool isAudio = false)
@@ -119,7 +118,7 @@ DECL_HOOKv(CreateAllWidgets)
     int size = gCreateWidgetFns.size();
     for(int i = 0; i < size; ++i)
     {
-        if(gCreateWidgetFns[i] != NULL) gCreateWidgetFns[i]();
+        gCreateWidgetFns[i]();
     }
 }
 DECL_HOOKv(WidgetButtonUpdate, CWidgetButton* self)
@@ -193,9 +192,9 @@ DECL_HOOK(unsigned short*, GxtTextGet, void* self, const char* txt)
     }
     return ret;
 }
-int None(...) {return 0;}
+int None(...){return 0;}
 char szSautilsVer[32];
-uintptr_t OnModSettingsOpened()
+MobileMenu* OnModSettingsOpened()
 {
     nCurrentItemTab = Mods;
     snprintf(szSautilsVer, sizeof(szSautilsVer), "SAUtils v%s", modinfo->VersionString());
@@ -222,13 +221,13 @@ uintptr_t OnModSettingsOpened()
 
 
     *(bool*)(menuScreenPointer + 48) = true; // Ready to be shown! Or... the other thingy?
-    if(*dword_6E0090)
+    if(gMobileMenu->m_nScreensCount)
     {
-        (*(void(**)(char*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(*dword_6E0094 + 4 * *dword_6E0090 - 4));
+        (*(void(**)(char*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
     }
-    if(*pCurrentMenuPointer != 0) ProcessMenuPending(pgMobileMenu);
-    *pCurrentMenuPointer = (int)menuScreenPointer;
-    return pgMobileMenu;
+    if(gMobileMenu->m_pTopScreen != NULL) ProcessMenuPending(gMobileMenu);
+    gMobileMenu->m_pTopScreen = (MenuScreen*)menuScreenPointer;
+    return gMobileMenu;
 }
 DECL_HOOK(uintptr_t, SettingsScreen, uintptr_t self)
 {
@@ -297,6 +296,23 @@ DECL_HOOKv(InitialiseGame_SecondPass)
         ++vStart;
     }
     g_bIsGameStartedAlready = true;
+}
+
+DECL_HOOKv(PlayerProcess, CPlayerInfo* self, int a1)
+{
+    if(self == &WorldPlayers[0])
+    {
+        int size = gPlayerUpdateFns.size();
+        for(int i = 0; i < size; ++i) gPlayerUpdateFns[i]((uintptr_t)self);
+
+        PlayerProcess(self, a1);
+
+        size = gPlayerUpdatePostFns.size();
+        for(int i = 0; i < size; ++i) gPlayerUpdatePostFns[i]((uintptr_t)self);
+
+        return;
+    }
+    PlayerProcess(self, a1);
 }
 
 uintptr_t NewScreen_Controls_backto, NewScreen_Game_backto, NewScreen_Display_backto, NewScreen_Audio_backto;
@@ -438,6 +454,7 @@ void SAUtils::InitializeSAUtils()
     HOOKPLT(SettingsScreen,             pGameLib + 0x674018);
     HOOKPLT(InitialiseRenderWare,       pGameLib + 0x66F2D0);
     HOOKPLT(InitialiseGame_SecondPass,  pGameLib + 0x672178);
+    HOOKPLT(PlayerProcess,              pGameLib + 0x673E84);
 
     // Hooked settings functions
     Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;
@@ -466,12 +483,10 @@ void SAUtils::InitializeSAUtils()
     SET_TO(SetSpriteTexture,            aml->GetSym(pGameHandle, "_ZN9CSprite2d10SetTextureEPc"));
     SET_TO(CopyRWTexture,               aml->GetSym(pGameHandle, "_ZN15CClothesBuilder11CopyTextureEP9RwTexture"));
     SET_TO(RwTextureDestroy,            aml->GetSym(pGameHandle, "_Z16RwTextureDestroyP9RwTexture"));
-    SET_TO(ClearTapHistory,             aml->GetSym(pGameHandle, "_ZN7CWidget15ClearTapHistoryEv"));
     
     SET_TO(Widget_IsTouched,            aml->GetSym(pGameHandle, "_ZN7CWidget9IsTouchedEP9CVector2D"));
     SET_TO(Widget_IsDoubleTapped,       aml->GetSym(pGameHandle, "_ZN7CWidget14IsDoubleTappedEv"));
     SET_TO(Widget_IsReleased,           aml->GetSym(pGameHandle, "_ZN7CWidget10IsReleasedEP9CVector2D"));
-    //SET_TO(Widget_IsHeldDown,           aml->GetSym(pGameHandle, "_ZN7CWidget10IsReleasedEP9CVector2D"));
     SET_TO(Widget_IsSwipedLeft,         aml->GetSym(pGameHandle, "_ZN7CWidget12IsSwipedLeftEv"));
     SET_TO(Widget_IsSwipedRight,        aml->GetSym(pGameHandle, "_ZN7CWidget13IsSwipedRightEv"));
     SET_TO(Widget_IsSwipedUp,           aml->GetSym(pGameHandle, "_ZN7CWidget10IsSwipedUpEv"));
@@ -479,18 +494,16 @@ void SAUtils::InitializeSAUtils()
     SET_TO(Touch_IsWidgetTouched,       aml->GetSym(pGameHandle, "_ZN15CTouchInterface9IsTouchedENS_9WidgetIDsEP9CVector2Di"));
     SET_TO(Touch_IsWidgetDoubleTapped,  aml->GetSym(pGameHandle, "_ZN15CTouchInterface14IsDoubleTappedENS_9WidgetIDsEbi"));
     SET_TO(Touch_IsWidgetReleased,      aml->GetSym(pGameHandle, "_ZN15CTouchInterface10IsReleasedENS_9WidgetIDsEP9CVector2Di"));
-    //SET_TO(Touch_IsWidgetHeldDown,      aml->GetSym(pGameHandle, "_ZN7CWidget15ClearTapHistoryEv"));
     SET_TO(Touch_IsWidgetSwipedLeft,    aml->GetSym(pGameHandle, "_ZN15CTouchInterface12IsSwipedLeftENS_9WidgetIDsEi"));
     SET_TO(Touch_IsWidgetSwipedRight,   aml->GetSym(pGameHandle, "_ZN15CTouchInterface13IsSwipedRightENS_9WidgetIDsEi"));
     SET_TO(Touch_IsWidgetSwipedUp,      aml->GetSym(pGameHandle, "_ZN15CTouchInterface10IsSwipedUpENS_9WidgetIDsEi"));
     SET_TO(Touch_IsWidgetSwipedDown,    aml->GetSym(pGameHandle, "_ZN15CTouchInterface12IsSwipedDownENS_9WidgetIDsEi"));
 
-    SET_TO(pCurrentMenuPointer,         pGameLib + 0x6E0098);
-    SET_TO(dword_6E0090,                pGameLib + 0x6E0090);
-    SET_TO(dword_6E0094,                pGameLib + 0x6E0094);
     SET_TO(gxtErrorString,              aml->GetSym(pGameHandle, "GxtErrorString"));
-    SET_TO(pgMobileMenu,                aml->GetSym(pGameHandle, "gMobileMenu"));
+    SET_TO(gMobileMenu,                 aml->GetSym(pGameHandle, "gMobileMenu"));
     SET_TO(m_snTimeInMilliseconds,      aml->GetSym(pGameHandle, "_ZN6CTimer22m_snTimeInMillisecondsE"));
+    SET_TO(game_FPS,                    aml->GetSym(pGameHandle, "_ZN6CTimer8game_FPSE"));
+    SET_TO(WorldPlayers,                *(void**)(pGameLib + 0x6783C8));
 }
 void SAUtils::InitializeVCUtils()
 {
@@ -664,6 +677,11 @@ unsigned int SAUtils::GetCurrentMs()
     return *m_snTimeInMilliseconds;
 }
 
+float SAUtils::GetCurrentFPS()
+{
+    return *game_FPS;
+}
+
 uintptr_t SAUtils::GetTextureDB(const char* texDbName)
 {
     return GetTexDB(texDbName);
@@ -686,10 +704,18 @@ uintptr_t SAUtils::GetTexture(const char* texName)
 
 void SAUtils::AddOnWidgetsCreateListener(SimpleFn fn)
 {
+    if(fn == NULL) return;
     gCreateWidgetFns.push_back(fn);
 }
 
-int SAUtils::FindFirstWidgetId()
+void SAUtils::AddPlayerUpdateListener(OnPlayerProcessFn fn, bool post)
+{
+    if(fn == NULL) return;
+    if(post) gPlayerUpdatePostFns.push_back(fn);
+    else     gPlayerUpdateFns.push_back(fn);
+}
+
+int SAUtils::FindFreeWidgetId()
 {
     for(int i = MAX_WIDGETS_GAME; i < MAX_WIDGETS; ++i)
     {
@@ -772,9 +798,14 @@ bool SAUtils::IsWidgetEnabled(int widgetId)
     return pNewWidgets[widgetId]->enabled;
 }
 
+void SAUtils::ClearWidgetTapHistory(int widgetId)
+{
+    memset(pNewWidgets[widgetId]->tapTimes, 0, sizeof(float)*10);
+}
+
 void SAUtils::ClearWidgetTapHistory(CWidgetButton* widget)
 {
-    ClearTapHistory(widget);
+    memset(widget->tapTimes, 0, sizeof(float)*10);
 }
 
 int SAUtils::GetWidgetState(CWidgetButton* widget, eWidgetState stateToGet)

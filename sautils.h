@@ -77,12 +77,14 @@ public:
 
     // 1.3
     unsigned int    GetCurrentMs();
+    float           GetCurrentFPS();
     uintptr_t       GetTextureDB(const char* texDbName);
     void            RegisterTextureDB(uintptr_t textureDbPtr);
     void            UnregisterTextureDB(uintptr_t textureDbPtr);
     uintptr_t       GetTexture(const char* texName);
     void            AddOnWidgetsCreateListener(SimpleFn fn);
-    int             FindFirstWidgetId();
+    void            AddPlayerUpdateListener(OnPlayerProcessFn fn, bool post = true);
+    int             FindFreeWidgetId();
     CWidgetButton*  CreateWidget(int widgetId, int x, int y, float scale, const char* textureName);
     int             GetWidgetIndex(CWidgetButton* widget);
     void            SetWidgetIcon(CWidgetButton* widget, uintptr_t texturePtr);
@@ -91,6 +93,7 @@ public:
     void            SetWidgetIcon2(CWidgetButton* widget, const char* textureName);
     void            ToggleWidget(CWidgetButton* widget, bool enable);
     bool            IsWidgetEnabled(int widgetId);
+    void            ClearWidgetTapHistory(int widgetId);
     void            ClearWidgetTapHistory(CWidgetButton* widget);
     int             GetWidgetState(CWidgetButton* widget, eWidgetState stateToGet);
     int             GetWidgetState(int widgetId, eWidgetState stateToGet, bool doDoubleTapEff = true, int frames = 1);
