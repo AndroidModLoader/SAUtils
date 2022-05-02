@@ -12,6 +12,7 @@ MYMODDECL();
 extern uintptr_t pGameLib;
 extern void* pGameHandle;
 void Redirect(uintptr_t addr, uintptr_t to);
+int None(...){return 0;}
 
 /* Callbacks */
 std::vector<SimpleFn>           gCreateWidgetFns;
@@ -22,9 +23,10 @@ std::vector<OnPlayerProcessFn>  gPlayerUpdatePostFns;
 std::vector<AdditionalSetting*> gMoreSettings;
 std::vector<AdditionalTexDB*>   gMoreTexDBs;
 std::vector<const char*>        gMoreIMGs;
+std::vector<AdditionalSettingsButton*> gMoreSettingButtons;
 int nNextSettingNum = MODS_SETTINGS_STARTING_FROM - 1;
 int nCurrentSliderId = 0;
-eTypeOfSettings nCurrentItemTab = Mods;
+eTypeOfSettings nCurrentItemTab = SetType_Mods;
 bool g_bIsGameStartedAlready = false;
 
 /* Patched vars */
@@ -89,12 +91,12 @@ void AddSettingsToScreen(void* screen)
         AdditionalSetting* setting = gMoreSettings[i];
         if(setting->eType == nCurrentItemTab)
         {
-            if(setting->byteItemType == Button)
+            if(setting->byteItemType == ItemType_Button)
             {
                 ButtonSettingItem* mob_rtd = new ButtonSettingItem;
                 mob_rtd->vtable = pGameLib + 0x66281C;
                 mob_rtd->itemText = setting->szName;
-                mob_rtd->actionFn = (uintptr_t)(setting->fnOnButtonPressed);
+                mob_rtd->actionFn = setting->fnOnButtonPressed == NULL ? (uintptr_t)None : (uintptr_t)setting->fnOnButtonPressed;
                 mob_rtd->flag = 0;
                 AddSettingsItemFn(screen, (uintptr_t)mob_rtd);
             }
@@ -157,7 +159,7 @@ void SettingsScreenClosed()
     for(int i = 0; i < size; ++i)
     {
         AdditionalSetting* setting = gMoreSettings[i];
-        if(setting->byteItemType != Button && setting->eType == nCurrentItemTab)
+        if(setting->byteItemType != ItemType_Button && setting->eType == nCurrentItemTab)
         {
             int nNewVal = sautils->ValueOfSettingsItem(setting->nSettingId);
             if(nNewVal != setting->nSavedVal)
@@ -192,16 +194,15 @@ DECL_HOOK(unsigned short*, GxtTextGet, void* self, const char* txt)
     }
     return ret;
 }
-int None(...){return 0;}
 char szSautilsVer[32];
+SettingsScreen* curScr = NULL;
 MobileMenu* OnModSettingsOpened()
 {
-    nCurrentItemTab = Mods;
+    nCurrentItemTab = SetType_Mods;
     snprintf(szSautilsVer, sizeof(szSautilsVer), "SAUtils v%s", modinfo->VersionString());
     char* menuScreenPointer = new char[0x44];
-    InitializeMenuPtr((uintptr_t)menuScreenPointer, "Mod Settings", true);
+    InitializeMenuPtr((uintptr_t)menuScreenPointer, "Mods Settings", true);
     *(uintptr_t*)menuScreenPointer = pGameLib + 0x6628D0; // Vtable
-
 
     ButtonSettingItem* sautilsVer = new ButtonSettingItem;
     sautilsVer->vtable = pGameLib + 0x66281C;
@@ -219,6 +220,30 @@ MobileMenu* OnModSettingsOpened()
     sautilsLine->flag = 0;
     AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsLine); // Empty line
 
+    *(bool*)(menuScreenPointer + 48) = true; // Ready to be shown! Or... the other thingy?
+    if(gMobileMenu->m_nScreensCount)
+    {
+        (*(void(**)(char*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
+    }
+    if(gMobileMenu->m_pTopScreen != NULL) ProcessMenuPending(gMobileMenu);
+    gMobileMenu->m_pTopScreen = (MenuScreen*)menuScreenPointer;
+    return gMobileMenu;
+}
+MobileMenu* OnCustomModSettingsOpened()
+{
+    nCurrentItemTab = (eTypeOfSettings)curScr->m_nChosenButton;
+    char* menuScreenPointer = new char[0x44];
+    InitializeMenuPtr((uintptr_t)menuScreenPointer, gMoreSettingButtons[curScr->m_nChosenButton - 6]->szName, true);
+    *(uintptr_t*)menuScreenPointer = pGameLib + 0x6628D0; // Vtable
+
+    AddSettingsToScreen((void*)menuScreenPointer); // Custom items
+
+    ButtonSettingItem* sautilsLine = new ButtonSettingItem;
+    sautilsLine->vtable = pGameLib + 0x66281C;
+    sautilsLine->itemText = "";
+    sautilsLine->actionFn = (uintptr_t)None;
+    sautilsLine->flag = 0;
+    AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsLine); // Empty line
 
     *(bool*)(menuScreenPointer + 48) = true; // Ready to be shown! Or... the other thingy?
     if(gMobileMenu->m_nScreensCount)
@@ -229,40 +254,50 @@ MobileMenu* OnModSettingsOpened()
     gMobileMenu->m_pTopScreen = (MenuScreen*)menuScreenPointer;
     return gMobileMenu;
 }
-DECL_HOOK(uintptr_t, SettingsScreen, uintptr_t self)
+void AddSettingsButton(SettingsScreen* self, const char* name, const char* textureName, FSButtonCallback callback)
 {
-    SettingsScreen(self);
-
-    // New "Mods" tab should be there!
-    RwTexture* tex = GetTextureFromDB("menu_mainsettings");
+    RwTexture* tex = GetTextureFromDB(textureName);
     ++tex->refCount;
-    int& tabsCount = *(int*)(self + 64);
-    uintptr_t container; // Maybe a storage for those tabs
-    if(*(int*)(self + 60) >= tabsCount + 1) // If we have a place for tabs
+    int& tabsCount = self->m_nButtonsCount;
+    FlowScreenButton* container;
+    if(self->m_nAllocatedCount >= tabsCount + 1) // If we have a place for tabs
     {
-        container = *(uintptr_t*)(self + 68);
+        container = self->m_pButtonsContainer;
     }
     else // If we dont have a place for tabs, reallocate more
     {
         int reallocCount = 4 * (tabsCount + 1) / 3u + 3;
-        void* newContainer = malloc(12 * reallocCount);
-        void* oldContainer = *(void **)(self + 68);
-        container = (uintptr_t)newContainer;
+        FlowScreenButton* newContainer = new FlowScreenButton[reallocCount];
+        FlowScreenButton* oldContainer = self->m_pButtonsContainer;
+        container = newContainer;
         if (oldContainer)
         {
-            memcpy(newContainer, *(const void **)(self + 68), 12 * tabsCount);
+            memcpy(newContainer, self->m_pButtonsContainer, sizeof(FlowScreenButton) * tabsCount);
             free(oldContainer);
-            tabsCount = *(int*)(self + 64);
+            tabsCount = self->m_nButtonsCount;
         }
-        *(int*)(self + 60) = reallocCount;
-        *(int*)(self + 68) = (int)container;
+        self->m_nAllocatedCount = reallocCount;
+        self->m_pButtonsContainer = container;
     }
-    container = container + 12 * tabsCount;
-    *(RwTexture**)(container + 0) = tex;
-    *(const char**)(container + 4) = "Mods settings";
-    *(uintptr_t*)(container + 8) = (uintptr_t)OnModSettingsOpened;
+    FlowScreenButton* btn = &container[tabsCount];
+    btn->m_pTexture = tex;
+    btn->m_szName = name;
+    btn->m_pOnPressed = callback;
     ++tabsCount;
+}
+DECL_HOOK(SettingsScreen*, SettingsScreen_Construct, SettingsScreen* self)
+{
+    curScr = self;
+    SettingsScreen_Construct(self);
+
     // New "Mods" tab should be there!
+    AddSettingsButton(self, "Mods settings", "menu_mainsettings", OnModSettingsOpened);
+    // New "Mods" tab should be there!
+
+    // Custom tabs!
+    int size = gMoreSettingButtons.size();
+    for(int i = 0; i < size; ++i) AddSettingsButton(self, gMoreSettingButtons[i]->szName, gMoreSettingButtons[i]->szTextureName, OnCustomModSettingsOpened);
+    // Custom tabs!
 
     return self;
 }
@@ -319,25 +354,25 @@ uintptr_t NewScreen_Controls_backto, NewScreen_Game_backto, NewScreen_Display_ba
 uintptr_t DrawSlider_backto;
 extern "C" void NewScreen_Controls_inject(void* self)
 {
-    nCurrentItemTab = Controller;
+    nCurrentItemTab = SetType_Controller;
     AddSettingsToScreen(self);
     AddRestoreDefaultsItem(self);
 }
 extern "C" void NewScreen_Game_inject(void* self)
 {
-    nCurrentItemTab = Game;
+    nCurrentItemTab = SetType_Game;
     AddSettingsToScreen(self);
     AddRestoreDefaultsItem(self);
 }
 extern "C" void NewScreen_Display_inject(void* self)
 {
-    nCurrentItemTab = Display;
+    nCurrentItemTab = SetType_Display;
     AddSettingsToScreen(self);
     AddRestoreDefaultsItem(self);
 }
 extern "C" void NewScreen_Audio_inject(void* self)
 {
-    nCurrentItemTab = Audio;
+    nCurrentItemTab = SetType_Audio;
     AddSettingsToScreen(self);
     AddRestoreDefaultsItem(self, true);
 }
@@ -373,7 +408,7 @@ __attribute__((optnone)) __attribute__((naked)) void NewScreen_Audio_stub(void)
 
 DECL_HOOK(void*, NewScreen_Language, void* self)
 {
-    nCurrentItemTab = Language;
+    nCurrentItemTab = SetType_Language;
     NewScreen_Language(self);
     AddSettingsToScreen(self);
     return self;
@@ -451,7 +486,7 @@ void SAUtils::InitializeSAUtils()
     HOOKPLT(SelectScreenOnDestroy,      pGameLib + 0x673FD8);
     HOOKPLT(SettingSelectionRender,     pGameLib + 0x662850);
     HOOKPLT(GxtTextGet,                 pGameLib + 0x66E78C);
-    HOOKPLT(SettingsScreen,             pGameLib + 0x674018);
+    HOOKPLT(SettingsScreen_Construct,   pGameLib + 0x674018);
     HOOKPLT(InitialiseRenderWare,       pGameLib + 0x66F2D0);
     HOOKPLT(InitialiseGame_SecondPass,  pGameLib + 0x672178);
     HOOKPLT(PlayerProcess,              pGameLib + 0x673E84);
@@ -547,7 +582,7 @@ int SAUtils::AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initV
     pNew->eType = typeOf;
     pNew->szName = name;
     pNew->fnOnValueChange = fnOnValueChange;
-    pNew->byteItemType = isSlider ? Slider : WithItems;
+    pNew->byteItemType = isSlider ? ItemType_Slider : ItemType_WithItems;
     pNew->nInitVal = (int)initVal;
     pNew->nSavedVal = (int)initVal;
     pNew->nMaxVal = maxVal;
@@ -582,7 +617,7 @@ int SAUtils::AddClickableItem(eTypeOfSettings typeOf, const char* name, int init
     pNew->fnOnValueChange = fnOnValueChange;
     pNew->fnOnValueDraw = NULL;
     pNew->fnOnButtonPressed = NULL;
-    pNew->byteItemType = WithItems;
+    pNew->byteItemType = ItemType_WithItems;
     pNew->nInitVal = (int)initVal;
     pNew->nSavedVal = (int)initVal;
     pNew->nMaxVal = maxVal;
@@ -608,7 +643,7 @@ int SAUtils::AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal
     pNew->fnOnValueChange = fnOnValueChange;
     pNew->fnOnValueDraw = fnOnValueDraw;
     pNew->fnOnButtonPressed = NULL;
-    pNew->byteItemType = Slider;
+    pNew->byteItemType = ItemType_Slider;
     pNew->nInitVal = (int)initVal;
     pNew->nSavedVal = (int)initVal;
     pNew->nMaxVal = maxVal;
@@ -626,8 +661,6 @@ int SAUtils::AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal
 // 1.2
 void SAUtils::AddButton(eTypeOfSettings typeOf, const char* name, OnButtonPressedFn fnOnButtonPressed)
 {
-    if(fnOnButtonPressed == NULL) return;
-
     AdditionalSetting* pNew = new AdditionalSetting;
     pNew->nSettingId = -1;
     pNew->eType = typeOf;
@@ -635,7 +668,7 @@ void SAUtils::AddButton(eTypeOfSettings typeOf, const char* name, OnButtonPresse
     pNew->fnOnValueChange = NULL;
     pNew->fnOnValueDraw = NULL;
     pNew->fnOnButtonPressed = fnOnButtonPressed;
-    pNew->byteItemType = Button;
+    pNew->byteItemType = ItemType_Button;
     pNew->nInitVal = 0;
     pNew->nSavedVal = 0;
     pNew->nMaxVal = 0;
@@ -670,6 +703,16 @@ void SAUtils::AddIMG(const char* imgName)
     gMoreIMGs.push_back(imgName);
 
     if(g_bIsGameStartedAlready) AddImageToList(imgName, false);
+}
+
+eTypeOfSettings SAUtils::AddSettingsTab(const char* name, const char* textureName)
+{
+    static unsigned char tabId = SETTINGS_COUNT-1;
+    AdditionalSettingsButton* pNew = new AdditionalSettingsButton;
+    pNew->szName = name;
+    pNew->szTextureName = textureName;
+    gMoreSettingButtons.push_back(pNew);
+    return (eTypeOfSettings)++tabId;
 }
 
 unsigned int SAUtils::GetCurrentMs()

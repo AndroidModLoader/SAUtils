@@ -57,21 +57,21 @@ class CWidgetButton;
 
 enum eTypeOfSettings : unsigned char
 {
-    Controller = 0,
-    Game = 1,
-    Display = 2,
-    Audio = 3,
-    Language = 4,
-    Mods = 5,
+    SetType_Controller = 0,
+    SetType_Game = 1,
+    SetType_Display = 2,
+    SetType_Audio = 3,
+    SetType_Language = 4,
+    SetType_Mods = 5,
 
     SETTINGS_COUNT
 };
 
 enum eTypeOfItem : unsigned char
 {
-    WithItems = 0,
-    Slider = 1,
-    Button = 2,
+    ItemType_WithItems = 0,
+    ItemType_Slider = 1,
+    ItemType_Button = 2,
 
     ITEMTYPES_COUNT
 };
@@ -178,6 +178,14 @@ public:
 
 /* Functions below added in 1.3.0.0 */
 
+    /** Creates a custom tabs in settings (like "Mods Settings")
+     *
+     *  \param name A name of settings tab
+     *  \param textureName A name of the texture from mobile.txt texdb (def: "menu_mainsettings")
+     *  \return An id to use with: AddButton or AddSliderItem or AddClickableItem
+     */
+    virtual eTypeOfSettings AddSettingsTab(const char* name, const char* textureName = "menu_mainsettings") = 0;
+
     /** Get current game time in milliseconds
      *
      *  \return Current milliseconds
@@ -283,7 +291,7 @@ public:
     /** Enable or disable widget
      *
      *  \param widget A pointer of the widget
-     *  \param enable Enable? (default: true)
+     *  \param enable Enable? (def: true)
      */
     virtual void ToggleWidget(CWidgetButton* widget, bool enable = true) = 0;
 
