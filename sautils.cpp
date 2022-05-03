@@ -20,19 +20,19 @@ std::vector<OnPlayerProcessFn>  gPlayerUpdateFns;
 std::vector<OnPlayerProcessFn>  gPlayerUpdatePostFns;
 
 /* Saves */
-std::vector<AdditionalSetting*> gMoreSettings;
-std::vector<AdditionalTexDB*>   gMoreTexDBs;
-std::vector<const char*>        gMoreIMGs;
+std::vector<AdditionalSetting*>        gMoreSettings;
+std::vector<AdditionalTexDB*>          gMoreTexDBs;
+std::vector<const char*>               gMoreIMGs;
 std::vector<AdditionalSettingsButton*> gMoreSettingButtons;
-int nNextSettingNum = MODS_SETTINGS_STARTING_FROM - 1;
-int nCurrentSliderId = 0;
+int             nNextSettingNum = MODS_SETTINGS_STARTING_FROM - 1;
+int             nCurrentSliderId = 0;
 eTypeOfSettings nCurrentItemTab = SetType_Mods;
-bool g_bIsGameStartedAlready = false;
+bool            g_bIsGameStartedAlready = false;
 
 /* Patched vars */
-int      pNewSettings[8 * MAX_SETTINGS] {0}; // A new char MobileSettings::settings[37*8*4]
-CWidget* pNewWidgets[MAX_WIDGETS] {NULL};
-char     pNewStreamingFiles[48 * (MAX_IMG_ARCHIVES + 2)] {0}; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
+int           pNewSettings[8 * MAX_SETTINGS] {0}; // A new char MobileSettings::settings[37*8*4]
+CWidget*      pNewWidgets[MAX_WIDGETS] {NULL};
+char          pNewStreamingFiles[48 * (MAX_IMG_ARCHIVES + 2)] {0}; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
 
 /* Funcs */
 typedef void* (*SettingsAddItemFn)(void* a1, uintptr_t a2);
@@ -72,6 +72,7 @@ unsigned short* gxtErrorString;
 uintptr_t OnRestoreDefaultsFn, OnRestoreDefaultsAudioFn;
 unsigned int* m_snTimeInMilliseconds;
 float* game_FPS;
+CWidget** orgWidgetsPtr;
 
 /* SAUtils */
 void AddRestoreDefaultsItem(void* screen, bool isAudio = false)
@@ -117,16 +118,12 @@ void AddSettingsToScreen(void* screen)
 DECL_HOOKv(CreateAllWidgets)
 {
     CreateAllWidgets();
+    memcpy(orgWidgetsPtr, pNewWidgets, sizeof(void*) * 150); // Hack to support old dumb CLEO's that cannot work the better way...
     int size = gCreateWidgetFns.size();
     for(int i = 0; i < size; ++i)
     {
         gCreateWidgetFns[i]();
     }
-}
-DECL_HOOKv(WidgetButtonUpdate, CWidgetButton* self)
-{
-    if(self->enabled) return;
-    WidgetButtonUpdate(self);
 }
 
 DECL_HOOK(unsigned short*, AsciiToGxtChar, const char* txt, unsigned short* ret)
@@ -333,21 +330,24 @@ DECL_HOOKv(InitialiseGame_SecondPass)
     g_bIsGameStartedAlready = true;
 }
 
-DECL_HOOKv(PlayerProcess, CPlayerInfo* self, int a1)
+DECL_HOOKv(PlayerProcess, CPlayerInfo* self, uint32_t playerIndex)
 {
-    if(self == &WorldPlayers[0])
+    int size;
+    if(playerIndex == 0 && (size = gPlayerUpdateFns.size()) > 0)
     {
-        int size = gPlayerUpdateFns.size();
         for(int i = 0; i < size; ++i) gPlayerUpdateFns[i]((uintptr_t)self);
 
-        PlayerProcess(self, a1);
+        PlayerProcess(self, playerIndex);
 
         size = gPlayerUpdatePostFns.size();
         for(int i = 0; i < size; ++i) gPlayerUpdatePostFns[i]((uintptr_t)self);
 
         return;
     }
-    PlayerProcess(self, a1);
+    else
+    {
+        PlayerProcess(self, playerIndex);
+    }
 }
 
 uintptr_t NewScreen_Controls_backto, NewScreen_Game_backto, NewScreen_Display_backto, NewScreen_Audio_backto;
@@ -479,7 +479,6 @@ void SAUtils::InitializeSAUtils()
     aml->Unprot(pGameLib + 0x2B0C34, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0C34) = (unsigned char)MAX_WIDGETS; // Draw All
     aml->Unprot(pGameLib + 0x2B28E8, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B28E8) = (unsigned char)MAX_WIDGETS-1; // AnyWidgetsUsingAltBack
     HOOKPLT(CreateAllWidgets, pGameLib + 0x6734E4);
-    //HOOK(WidgetButtonUpdate, aml->GetSym(pGameHandle, "_ZN13CWidgetButton6UpdateEv"));
 
     // Hook functions
     HOOKPLT(AsciiToGxtChar,             pGameLib + 0x6724F8);
@@ -538,6 +537,7 @@ void SAUtils::InitializeSAUtils()
     SET_TO(gMobileMenu,                 aml->GetSym(pGameHandle, "gMobileMenu"));
     SET_TO(m_snTimeInMilliseconds,      aml->GetSym(pGameHandle, "_ZN6CTimer22m_snTimeInMillisecondsE"));
     SET_TO(game_FPS,                    aml->GetSym(pGameHandle, "_ZN6CTimer8game_FPSE"));
+    SET_TO(orgWidgetsPtr,               aml->GetSym(pGameHandle, "_ZN15CTouchInterface10m_pWidgetsE"));
     SET_TO(WorldPlayers,                *(void**)(pGameLib + 0x6783C8));
 }
 void SAUtils::InitializeVCUtils()
