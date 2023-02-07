@@ -2,11 +2,13 @@
 #define _SAUTILS_INTERFACE
 
 #include <stdint.h>
+#include "sa_scripting.h"
 
-typedef void        (*OnSettingChangedFn)(int nOldValue, int nNewValue);
-typedef const char* (*OnSettingDrawedFn) (int nNewValue);
+typedef void        (*OnSettingChangedFn)(int nOldValue, int nNewValue, void* pData); // Has pData since v1.4
+typedef const char* (*OnSettingDrawedFn) (int nNewValue, void* pData);
 typedef void        (*OnButtonPressedFn) (uintptr_t screen); // "screen" is just a pointer of SelectScreen if you need it...
 typedef void        (*OnPlayerProcessFn) (uintptr_t info); // "info" is a pointer of CPlayerInfo
+typedef void*       (*LookingForTextureFn)(const char* name);
 typedef void        (*SimpleFn)();
 
 #define MAX_IMG_ARCHIVES                    32 // Def. is 6
@@ -359,6 +361,71 @@ public:
      *  \param sy Scale Y
      */
     virtual void SetWidgetPos(int widgetId, float x, float y, float sx, float sy);
+
+
+/* Functions below added in 1.4.0.0 */
+    
+    /** Reads the png image file and converts it to RwTexture*
+     *
+     *  \param filename Self-explained?
+     *  \return An actual pointer of RwTexture*
+     */
+    virtual void* LoadRwTextureFromPNG(const char* filename) = 0;
+    
+    /** Reads the bmp image file and converts it to RwTexture*
+     *
+     *  \param filename Self-explained?
+     *  \return An actual pointer of RwTexture*
+     */
+    virtual void* LoadRwTextureFromBMP(const char* filename) = 0;
+
+    /** Add a listener of "RenderWare Engine initialized"
+     *
+     *  \param fn A function that will be called when Widgets are added
+     */
+    virtual void AddOnRWInitListener(SimpleFn fn) = 0;
+
+    /** Add a listener of "RenderWare Engine initialized"
+     *
+     *  \param fn A function that will be called when Widgets are added
+     */
+    virtual void AddTextureLookupListener(LookingForTextureFn fn) = 0;
+
+    /** Adds clickable text button in menu settings + sends own data
+     *
+     *  \param typeOf In which setting option that item should be added
+     *  \param name Obviously a displayed name
+     *  \param initVal Initial value (def: 0)
+     *  \param minVal Minimum value (def: 0)
+     *  \param maxVal Maximum value (def: 0)
+     *  \param switchesArray An array that includes names of options
+     *  \param fnOnValueChange A function that will be called on value being saved (def: null)
+     *  \param data An own data (def: null)
+     *  \return Setting ID
+     */
+    virtual int AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, const char** switchesArray = NULL, OnSettingChangedFn fnOnValueChange = NULL, void* data = NULL) = 0;
+
+    /** Adds a slider in menu settings + data
+     *
+     *  \param typeOf In which setting option that item should be added
+     *  \param name Obviously a displayed name
+     *  \param initVal Initial value (def: 0)
+     *  \param minVal Minimum value (def: 0)
+     *  \param maxVal Maximum value (def: 0)
+     *  \param fnOnValueChange A function that will be called on value being saved (def: null)
+     *  \param fnOnValueDraw A function that will control a text of a slider (def: null)
+     *  \param data An own data (def: null)
+     *  \return Setting ID
+     */
+    virtual int AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, OnSettingDrawedFn fnOnValueDraw = NULL, void* data = NULL) = 0;
+
+    /** Calls a script opcode (mini-cleo)
+     *
+     *  \param pScriptCommand A pointer to SCRIPT_COMMAND struct var
+     *  \param ... All arguments
+     *  \return A possibly returned value
+     */
+    virtual int ScriptCommand(const SCRIPT_COMMAND *pScriptCommand, ...) = 0;
 };
 
 #endif // _SAUTILS_INTERFACE

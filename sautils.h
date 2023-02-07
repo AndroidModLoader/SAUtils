@@ -1,7 +1,7 @@
 #include <isautils.h>
 
 #define MODS_SETTINGS_STARTING_FROM  37
-#define MAX_SETTINGS                 200
+#define MAX_SETTINGS                 1200
 
 enum eLoadedGame
 {
@@ -24,6 +24,13 @@ struct AdditionalSetting
     int                nInitVal;
     int                nSavedVal;
     int                nMaxVal;
+    void*              pOwnData;
+};
+
+struct AdditionalSettingsButton
+{
+    const char*        szName;
+    const char*        szTextureName;
 };
 
 struct AdditionalTexDB
@@ -76,6 +83,7 @@ public:
     void            AddIMG(const char* imgName);
 
     // 1.3
+    eTypeOfSettings AddSettingsTab(const char* name, const char* textureName = "menu_mainsettings");
     unsigned int    GetCurrentMs();
     float           GetCurrentFPS();
     uintptr_t       GetTextureDB(const char* texDbName);
@@ -100,6 +108,15 @@ public:
     void            GetWidgetPos(int widgetId, float* x = NULL, float* y = NULL, float* sx = NULL, float* sy = NULL);
     void            SetWidgetPos(int widgetId, float x, float y, float sx, float sy);
 
+    // 1.4
+    void*           LoadRwTextureFromPNG(const char* filename);
+    void*           LoadRwTextureFromBMP(const char* filename);
+    void            AddOnRWInitListener(SimpleFn fn);
+    void            AddTextureLookupListener(LookingForTextureFn fn);
+    int             AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, const char** switchesArray = NULL, OnSettingChangedFn fnOnValueChange = NULL, void* data = NULL); // +data
+    int             AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, OnSettingDrawedFn fnOnValueDraw = NULL, void* data = NULL); // +data
+    int             ScriptCommand(const SCRIPT_COMMAND *pScriptCommand, ...);
+    
 public:
     eLoadedGame     m_eLoadedGame;
     uintptr_t       m_pHasFLA;

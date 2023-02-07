@@ -11,13 +11,19 @@
 MYMODDECL();
 extern uintptr_t pGameLib;
 extern void* pGameHandle;
-void Redirect(uintptr_t addr, uintptr_t to);
+
+// ScriptingRelated
+
+void InitializeSAScripting();
+
 int None(...){return 0;}
 
 /* Callbacks */
-std::vector<SimpleFn>           gCreateWidgetFns;
-std::vector<OnPlayerProcessFn>  gPlayerUpdateFns;
-std::vector<OnPlayerProcessFn>  gPlayerUpdatePostFns;
+std::vector<SimpleFn>                  gCreateWidgetFns;
+std::vector<OnPlayerProcessFn>         gPlayerUpdateFns;
+std::vector<OnPlayerProcessFn>         gPlayerUpdatePostFns;
+std::vector<SimpleFn>                  gInitRWFns;
+std::vector<LookingForTextureFn>       gTextureLookupFns;
 
 /* Saves */
 std::vector<AdditionalSetting*>        gMoreSettings;
@@ -48,6 +54,7 @@ int           (*AddImageToList)(const char* imgName, bool isPlayerImg);
 void          (*WidgetButton_Constructor)(CWidgetButton*, char const*, WidgetPosition const&, unsigned int, unsigned int, HIDMapping);
 void          (*SetSpriteTexture)(CSprite2d*, const char*);
 RwTexture*    (*CopyRWTexture)(RwTexture*);
+RwTexture*    (*RwTextureCreate)(RwRaster*);
 void          (*RwTextureDestroy)(RwTexture*);
 bool          (*Widget_IsTouched)(CWidget*);
 bool          (*Widget_IsDoubleTapped)(CWidget*);
@@ -63,6 +70,12 @@ bool          (*Touch_IsWidgetSwipedLeft)(int widgetId, int frames);
 bool          (*Touch_IsWidgetSwipedRight)(int widgetId, int frames);
 bool          (*Touch_IsWidgetSwipedUp)(int widgetId, int frames);
 bool          (*Touch_IsWidgetSwipedDown)(int widgetId, int frames);
+RwImage*      (*RtPNGImageRead)(const char* filename);
+RwImage*      (*RtBMPImageRead)(const char* filename);
+void          (*RwImageFindRasterFormat)(RwImage*, int, int*, int*, int*, int*);
+RwRaster*     (*RwRasterCreate)(int, int, int, int);
+void          (*RwRasterSetFromImage)(RwRaster*, RwImage*);
+void          (*RwImageDestroy)(RwImage*);
 
 /* GTASA Pointers */
 SettingsAddItemFn AddSettingsItemFn;
@@ -140,7 +153,7 @@ DECL_HOOK(unsigned short*, AsciiToGxtChar, const char* txt, unsigned short* ret)
                 {
                     int val = pNewSettings[8 * nCurrentSliderId + 2];
                     nCurrentSliderId = 0;
-                    return AsciiToGxtChar(setting->fnOnValueDraw(val), ret);
+                    return AsciiToGxtChar(setting->fnOnValueDraw(val, setting->pOwnData), ret);
                 }
                 nCurrentSliderId = 0;
                 break;
@@ -161,7 +174,10 @@ void SettingsScreenClosed()
             int nNewVal = sautils->ValueOfSettingsItem(setting->nSettingId);
             if(nNewVal != setting->nSavedVal)
             {
-                if(setting->fnOnValueChange != NULL) setting->fnOnValueChange(setting->nSavedVal, nNewVal);
+                if(setting->fnOnValueChange != NULL)
+                {
+                    setting->fnOnValueChange(setting->nSavedVal, nNewVal, setting->pOwnData);
+                }
                 setting->nSavedVal = nNewVal;
             }
         }
@@ -253,7 +269,9 @@ MobileMenu* OnCustomModSettingsOpened()
 }
 void AddSettingsButton(SettingsScreen* self, const char* name, const char* textureName, FSButtonCallback callback)
 {
-    RwTexture* tex = GetTextureFromDB(textureName);
+    RwTexture* tex = (RwTexture*)sautils->LoadRwTextureFromPNG(textureName);
+    if(!tex) tex = GetTextureFromDB(textureName);
+    if(!tex) tex = GetTextureFromDB("menu_mainsettings");
     ++tex->refCount;
     int& tabsCount = self->m_nButtonsCount;
     FlowScreenButton* container;
@@ -288,7 +306,7 @@ DECL_HOOK(SettingsScreen*, SettingsScreen_Construct, SettingsScreen* self)
     SettingsScreen_Construct(self);
 
     // New "Mods" tab should be there!
-    AddSettingsButton(self, "Mods settings", "menu_mainsettings", OnModSettingsOpened);
+    AddSettingsButton(self, "Mods settings", "AML/images/amllogo.png", OnModSettingsOpened);
     // New "Mods" tab should be there!
 
     // Custom tabs!
@@ -302,6 +320,12 @@ DECL_HOOK(SettingsScreen*, SettingsScreen_Construct, SettingsScreen* self)
 DECL_HOOKv(InitialiseRenderWare)
 {
     InitialiseRenderWare();
+    
+    int size = gInitRWFns.size();
+    for(int i = 0; i < size; ++i)
+    {
+        gInitRWFns[i]();
+    }
 
     auto vStart = gMoreTexDBs.begin();
     auto vEnd = gMoreTexDBs.end();
@@ -332,9 +356,9 @@ DECL_HOOKv(InitialiseGame_SecondPass)
 
 DECL_HOOKv(PlayerProcess, CPlayerInfo* self, uint32_t playerIndex)
 {
-    int size;
-    if(playerIndex == 0 && (size = gPlayerUpdateFns.size()) > 0)
+    if(playerIndex == 0)
     {
+        int size = gPlayerUpdateFns.size();
         for(int i = 0; i < size; ++i) gPlayerUpdateFns[i]((uintptr_t)self);
 
         PlayerProcess(self, playerIndex);
@@ -442,6 +466,20 @@ int AddImageToListPatched(const char* imgName, bool isPlayerImg)
     return 0;
 }
 
+DECL_HOOK(void*, GetTextureFromDB_HOOKED, const char* texName)
+{
+    int size = gTextureLookupFns.size();
+    for(int i = 0; i < size; ++i)
+    {
+        void* tex = gTextureLookupFns[i](texName);
+        if(tex) return tex;
+    }
+    
+    RwTexture* tex = (RwTexture*)GetTextureFromDB_HOOKED(texName);
+    if(tex) logger->Info("%s (%s) %d 0x%08X 0x%08X 0x%08X", texName, tex->raster->texdbInfo->unk1, (int)tex->raster->cType, (int)tex->raster->cFlags, (int)tex->raster->privateFlags, (int)tex->raster->texdbFlags);
+    return tex;
+}
+
 void SAUtils::InitializeSAUtils()
 {
     // Freak ya FLA and your sh*t
@@ -453,7 +491,7 @@ void SAUtils::InitializeSAUtils()
         *(unsigned char*)(pGameLib + 0x46BD78) = (unsigned char)MAX_IMG_ARCHIVES+2;
         aml->Unprot(pGameLib + 0x46BFE4, sizeof(char)); 
         *(unsigned char*)(pGameLib + 0x46BFE4) = (unsigned char)MAX_IMG_ARCHIVES+2;
-        Redirect(aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"), (uintptr_t)AddImageToListPatched);
+        aml->Redirect(aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"), (uintptr_t)AddImageToListPatched);
 
         logger->Info("IMG limit has been bumped!");
     }
@@ -491,10 +529,10 @@ void SAUtils::InitializeSAUtils()
     HOOKPLT(PlayerProcess,              pGameLib + 0x673E84);
 
     // Hooked settings functions
-    Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;
-    Redirect(pGameLib + 0x2A49F6 + 0x1, (uintptr_t)NewScreen_Game_stub); NewScreen_Game_backto = pGameLib + 0x2A4A1E + 0x1;
-    Redirect(pGameLib + 0x2A4BD4 + 0x1, (uintptr_t)NewScreen_Display_stub); NewScreen_Display_backto = pGameLib + 0x2A4BFC + 0x1;
-    Redirect(pGameLib + 0x2A4D3C + 0x1, (uintptr_t)NewScreen_Audio_stub); NewScreen_Audio_backto = pGameLib + 0x2A4D64 + 0x1;
+    aml->Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;
+    aml->Redirect(pGameLib + 0x2A49F6 + 0x1, (uintptr_t)NewScreen_Game_stub); NewScreen_Game_backto = pGameLib + 0x2A4A1E + 0x1;
+    aml->Redirect(pGameLib + 0x2A4BD4 + 0x1, (uintptr_t)NewScreen_Display_stub); NewScreen_Display_backto = pGameLib + 0x2A4BFC + 0x1;
+    aml->Redirect(pGameLib + 0x2A4D3C + 0x1, (uintptr_t)NewScreen_Audio_stub); NewScreen_Audio_backto = pGameLib + 0x2A4D64 + 0x1;
     HOOKPLT(NewScreen_Language,         pGameLib + 0x675D90);
 
     // Slider drawing hook
@@ -516,7 +554,14 @@ void SAUtils::InitializeSAUtils()
     SET_TO(WidgetButton_Constructor,    aml->GetSym(pGameHandle, "_ZN13CWidgetButtonC2EPKcRK14WidgetPositionjj10HIDMapping"));
     SET_TO(SetSpriteTexture,            aml->GetSym(pGameHandle, "_ZN9CSprite2d10SetTextureEPc"));
     SET_TO(CopyRWTexture,               aml->GetSym(pGameHandle, "_ZN15CClothesBuilder11CopyTextureEP9RwTexture"));
+    SET_TO(RwTextureCreate,             aml->GetSym(pGameHandle, "_Z15RwTextureCreateP8RwRaster"));
     SET_TO(RwTextureDestroy,            aml->GetSym(pGameHandle, "_Z16RwTextureDestroyP9RwTexture"));
+    SET_TO(RtPNGImageRead,              aml->GetSym(pGameHandle, "_Z14RtPNGImageReadPKc"));
+    SET_TO(RtBMPImageRead,              aml->GetSym(pGameHandle, "_Z14RtBMPImageReadPKc"));
+    SET_TO(RwImageFindRasterFormat,     aml->GetSym(pGameHandle, "_Z23RwImageFindRasterFormatP7RwImageiPiS1_S1_S1_"));
+    SET_TO(RwRasterCreate,              aml->GetSym(pGameHandle, "_Z14RwRasterCreateiiii"));
+    SET_TO(RwRasterSetFromImage,        aml->GetSym(pGameHandle, "_Z20RwRasterSetFromImageP8RwRasterP7RwImage"));
+    SET_TO(RwImageDestroy,              aml->GetSym(pGameHandle, "_Z14RwImageDestroyP7RwImage"));
     
     SET_TO(Widget_IsTouched,            aml->GetSym(pGameHandle, "_ZN7CWidget9IsTouchedEP9CVector2D"));
     SET_TO(Widget_IsDoubleTapped,       aml->GetSym(pGameHandle, "_ZN7CWidget14IsDoubleTappedEv"));
@@ -539,6 +584,12 @@ void SAUtils::InitializeSAUtils()
     SET_TO(game_FPS,                    aml->GetSym(pGameHandle, "_ZN6CTimer8game_FPSE"));
     SET_TO(orgWidgetsPtr,               aml->GetSym(pGameHandle, "_ZN15CTouchInterface10m_pWidgetsE"));
     SET_TO(WorldPlayers,                *(void**)(pGameLib + 0x6783C8));
+    
+    // Crazy idea to hook everything!!1!!1!
+    HOOK(GetTextureFromDB_HOOKED,             aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
+    
+    // Scripting
+    InitializeSAScripting();
 }
 void SAUtils::InitializeVCUtils()
 {
@@ -548,15 +599,15 @@ void SAUtils::InitializeVCUtils()
     //*(uintptr_t*)(pGameLib + 0x679A40) = (uintptr_t)pNewSettings;
     //memcpy(pNewSettings, (int*)(pGameLib + 0x6E03F4), 1184);
 
-    HOOK(GxtTextGet, dlsym(pGameHandle, "_ZN5CText3GetEPKc"));
-    HOOK(AsciiToGxtChar, dlsym(pGameHandle, "_Z14AsciiToUnicodePKcPt"));
+    HOOK(GxtTextGet, aml->GetSym(pGameHandle, "_ZN5CText3GetEPKc"));
+    HOOK(AsciiToGxtChar, aml->GetSym(pGameHandle, "_Z14AsciiToUnicodePKcPt"));
     //HOOKPLT(NewScreen_Controls, pGameLib + 0x675CD8);
     //HOOKPLT(NewScreen_Game, pGameLib + 0x674310);
     //HOOKPLT(NewScreen_Display, pGameLib + 0x675150);
     //HOOKPLT(NewScreen_Audio, pGameLib + 0x66FBA4);
     //HOOKPLT(NewScreen_Language, pGameLib + 0x675D90);
     //HOOKPLT(SelectScreenAddItem, pGameLib + 0x674518);
-    HOOK(SelectScreenOnDestroy, dlsym(pGameHandle, "_ZN12CMenuManager4BackEv"));
+    HOOK(SelectScreenOnDestroy, aml->GetSym(pGameHandle, "_ZN12CMenuManager4BackEv"));
 
     //fnSettingsAddItem = (SettingsAddItemFn)(pGameLib + 0x19C840);
 }
@@ -586,6 +637,7 @@ int SAUtils::AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initV
     pNew->nInitVal = (int)initVal;
     pNew->nSavedVal = (int)initVal;
     pNew->nMaxVal = maxVal;
+    pNew->pOwnData = NULL;
     gMoreSettings.push_back(pNew);
 
     pNewSettings[8 * nNextSettingNum + 1] = (int)switchesArray; // Items of that setting
@@ -607,6 +659,10 @@ int SAUtils::ValueOfSettingsItem(int settingId)
 
 int SAUtils::AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal, int minVal, int maxVal, const char** switchesArray, OnSettingChangedFn fnOnValueChange)
 {
+    return AddClickableItem(typeOf, name, initVal, minVal, maxVal, switchesArray, fnOnValueChange, NULL);
+}
+int SAUtils::AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal, int minVal, int maxVal, const char** switchesArray, OnSettingChangedFn fnOnValueChange, void* data)
+{
     if(nNextSettingNum >= MAX_SETTINGS) return -1;
 
     ++nNextSettingNum;
@@ -621,6 +677,7 @@ int SAUtils::AddClickableItem(eTypeOfSettings typeOf, const char* name, int init
     pNew->nInitVal = (int)initVal;
     pNew->nSavedVal = (int)initVal;
     pNew->nMaxVal = maxVal;
+    pNew->pOwnData = data;
     gMoreSettings.push_back(pNew);
 
     pNewSettings[8 * nNextSettingNum + 1] = (int)switchesArray;
@@ -631,7 +688,12 @@ int SAUtils::AddClickableItem(eTypeOfSettings typeOf, const char* name, int init
 
     return nNextSettingNum;
 }
+
 int SAUtils::AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal, int minVal, int maxVal, OnSettingChangedFn fnOnValueChange, OnSettingDrawedFn fnOnValueDraw)
+{
+    return AddSliderItem(typeOf, name, initVal, minVal, maxVal, fnOnValueChange, fnOnValueDraw, NULL);
+}
+int SAUtils::AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal, int minVal, int maxVal, OnSettingChangedFn fnOnValueChange, OnSettingDrawedFn fnOnValueDraw, void* data)
 {
     if(nNextSettingNum >= MAX_SETTINGS) return -1;
 
@@ -647,6 +709,7 @@ int SAUtils::AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal
     pNew->nInitVal = (int)initVal;
     pNew->nSavedVal = (int)initVal;
     pNew->nMaxVal = maxVal;
+    pNew->pOwnData = data;
     gMoreSettings.push_back(pNew);
 
     pNewSettings[8 * nNextSettingNum + 1] = (int)NULL;
@@ -926,6 +989,60 @@ void SAUtils::SetWidgetPos(int widgetId, float x, float y, float sx, float sy)
     WidgetPosition& p = pNewWidgets[widgetId]->posScale;
     p.pos.x = x;    p.pos.y = y;
     p.scale.x = sx; p.scale.y = sy;
+}
+
+void* SAUtils::LoadRwTextureFromPNG(const char* fn)
+{
+    RwTexture* pTexture = NULL;
+    if (RwImage* pImage = RtPNGImageRead(fn))
+    {
+        int width, height, depth, flags;
+        RwImageFindRasterFormat(pImage, rwRASTERTYPETEXTURE, &width, &height, &depth, &flags);
+        if (RwRaster* pRaster = RwRasterCreate(width, height, depth, flags))
+        {
+            RwRasterSetFromImage(pRaster, pImage);
+            pTexture = RwTextureCreate(pRaster);
+        }
+        RwImageDestroy(pImage);
+    }
+    return pTexture;
+}
+
+void* SAUtils::LoadRwTextureFromBMP(const char* fn)
+{
+    RwTexture* pTexture = NULL;
+    if(RwImage* pImage = RtBMPImageRead(fn))
+    {
+        int width, height, depth, flags;
+        RwImageFindRasterFormat(pImage, rwRASTERTYPETEXTURE, &width, &height, &depth, &flags);
+        if(RwRaster* pRaster = RwRasterCreate(width, height, depth, flags | 0x4))
+        {
+            RwRasterSetFromImage(pRaster, pImage);
+            pTexture = RwTextureCreate(pRaster);
+        }
+        RwImageDestroy(pImage);
+    }
+    return pTexture;
+}
+
+void SAUtils::AddOnRWInitListener(SimpleFn fn)
+{
+    gInitRWFns.push_back(fn);
+}
+
+void SAUtils::AddTextureLookupListener(LookingForTextureFn fn)
+{
+    gTextureLookupFns.push_back(fn);
+}
+
+int ScriptSACommand(const SCRIPT_COMMAND *pScriptCommand, va_list ap);
+int SAUtils::ScriptCommand(const SCRIPT_COMMAND *pScriptCommand, ...)
+{
+    va_list ap;
+    va_start(ap, pScriptCommand);
+    int ret = ScriptSACommand(pScriptCommand, ap);
+    va_end(ap);
+    return ret;
 }
 
 static SAUtils sautilsLocal;
