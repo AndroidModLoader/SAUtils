@@ -116,6 +116,7 @@ public:
     int             AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, const char** switchesArray = NULL, OnSettingChangedFn fnOnValueChange = NULL, void* data = NULL); // +data
     int             AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, OnSettingDrawedFn fnOnValueDraw = NULL, void* data = NULL); // +data
     int             ScriptCommand(const SCRIPT_COMMAND *pScriptCommand, ...);
+    void            AddOnRenderListener(eRenderOfType typeOf, SimpleDataFn fn);
     
 public:
     eLoadedGame     m_eLoadedGame;

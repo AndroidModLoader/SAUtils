@@ -10,6 +10,7 @@ typedef void        (*OnButtonPressedFn) (uintptr_t screen); // "screen" is just
 typedef void        (*OnPlayerProcessFn) (uintptr_t info); // "info" is a pointer of CPlayerInfo
 typedef void*       (*LookingForTextureFn)(const char* name);
 typedef void        (*SimpleFn)();
+typedef void        (*SimpleDataFn)(void* data);
 
 #define MAX_IMG_ARCHIVES                    32 // Def. is 6
 
@@ -90,6 +91,18 @@ enum eWidgetState : unsigned char
     WState_SwipedDown,
 
     WIDGETSTATE_MAX
+};
+
+enum eRenderOfType : unsigned char
+{
+    ROfType_Effects = 0,
+    ROfType_Menu,
+    ROfType_Hud,
+    ROfType_Ped,
+    ROfType_Vehicle,
+    ROfType_Object,
+
+    RENDEROFTYPE_MAX
 };
 
 class ISAUtils
@@ -426,6 +439,13 @@ public:
      *  \return A possibly returned value
      */
     virtual int ScriptCommand(const SCRIPT_COMMAND *pScriptCommand, ...) = 0;
+    
+    /** Add a listener to "Render" function of something
+     *
+     *  \param typeOf What are listening to? See eRenderOfType
+     *  \param fn Function that will be called
+     */
+    virtual void AddOnRenderListener(eRenderOfType typeOf, SimpleDataFn fn) = 0;
 };
 
 #endif // _SAUTILS_INTERFACE

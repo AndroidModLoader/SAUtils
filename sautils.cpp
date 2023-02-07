@@ -24,6 +24,7 @@ std::vector<OnPlayerProcessFn>         gPlayerUpdateFns;
 std::vector<OnPlayerProcessFn>         gPlayerUpdatePostFns;
 std::vector<SimpleFn>                  gInitRWFns;
 std::vector<LookingForTextureFn>       gTextureLookupFns;
+std::vector<SimpleDataFn>              gRenderOfTypeFns[RENDEROFTYPE_MAX];
 
 /* Saves */
 std::vector<AdditionalSetting*>        gMoreSettings;
@@ -480,6 +481,57 @@ DECL_HOOK(void*, GetTextureFromDB_HOOKED, const char* texName)
     return tex;
 }
 
+DECL_HOOKv(RenderEffects)
+{
+    RenderEffects();
+    int size = gRenderOfTypeFns[ROfType_Effects].size();
+    for(int i = 0; i < size; ++i)
+    {
+        gRenderOfTypeFns[ROfType_Effects][i](NULL);
+    }
+}
+DECL_HOOKv(RenderMenu, void* self)
+{
+    RenderMenu(self);
+    int size = gRenderOfTypeFns[ROfType_Menu].size();
+    for(int i = 0; i < size; ++i)
+    {
+        gRenderOfTypeFns[ROfType_Menu][i](self);
+    }
+}
+DECL_HOOKv(RenderPed, void* self)
+{
+    RenderPed(self);
+    int size = gRenderOfTypeFns[ROfType_Ped].size();
+    for(int i = 0; i < size; ++i)
+    {
+        gRenderOfTypeFns[ROfType_Ped][i](self);
+    }
+}
+DECL_HOOKv(RenderVehicle, void* self)
+{
+    RenderVehicle(self);
+    int size = gRenderOfTypeFns[ROfType_Vehicle].size();
+    for(int i = 0; i < size; ++i)
+    {
+        gRenderOfTypeFns[ROfType_Vehicle][i](self);
+    }
+}
+DECL_HOOKv(RenderObject, void* self)
+{
+    RenderObject(self);
+    int size = gRenderOfTypeFns[ROfType_Object].size();
+    for(int i = 0; i < size; ++i)
+    {
+        gRenderOfTypeFns[ROfType_Object][i](self);
+    }
+}
+
+
+
+
+/* !!! OUR SAUTILS INTERFACE IS BELOW !!! */
+
 void SAUtils::InitializeSAUtils()
 {
     // Freak ya FLA and your sh*t
@@ -527,6 +579,11 @@ void SAUtils::InitializeSAUtils()
     HOOKPLT(InitialiseRenderWare,       pGameLib + 0x66F2D0);
     HOOKPLT(InitialiseGame_SecondPass,  pGameLib + 0x672178);
     HOOKPLT(PlayerProcess,              pGameLib + 0x673E84);
+    HOOK(RenderEffects, aml->GetSym(pGameHandle, "_Z13RenderEffectsv"));
+    HOOK(RenderMenu, aml->GetSym(pGameHandle, "_ZN10MobileMenu6RenderEv"));
+    HOOK(RenderPed, aml->GetSym(pGameHandle, "_ZN4CPed6RenderEv"));
+    HOOK(RenderVehicle, aml->GetSym(pGameHandle, "_ZN8CVehicle6RenderEv"));
+    HOOK(RenderObject, aml->GetSym(pGameHandle, "_ZN7CObject6RenderEv"));
 
     // Hooked settings functions
     aml->Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;
@@ -1043,6 +1100,12 @@ int SAUtils::ScriptCommand(const SCRIPT_COMMAND *pScriptCommand, ...)
     int ret = ScriptSACommand(pScriptCommand, ap);
     va_end(ap);
     return ret;
+}
+
+void SAUtils::AddOnRenderListener(eRenderOfType typeOf, SimpleDataFn fn)
+{
+    if(typeOf >= RENDEROFTYPE_MAX) return;
+    gRenderOfTypeFns[typeOf].push_back(fn);
 }
 
 static SAUtils sautilsLocal;
