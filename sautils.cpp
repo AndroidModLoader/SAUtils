@@ -477,7 +477,7 @@ DECL_HOOK(void*, GetTextureFromDB_HOOKED, const char* texName)
     }
     
     RwTexture* tex = (RwTexture*)GetTextureFromDB_HOOKED(texName);
-    if(tex) logger->Info("%s (%s) %d 0x%08X 0x%08X 0x%08X", texName, tex->raster->texdbInfo->unk1, (int)tex->raster->cType, (int)tex->raster->cFlags, (int)tex->raster->privateFlags, (int)tex->raster->texdbFlags);
+    //if(tex) logger->Info("%s (%s) %d 0x%08X 0x%08X 0x%08X", texName, tex->raster->texdbInfo->unk1, (int)tex->raster->cType, (int)tex->raster->cFlags, (int)tex->raster->privateFlags, (int)tex->raster->texdbFlags);
     return tex;
 }
 
