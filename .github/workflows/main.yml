@@ -1,0 +1,50 @@
+name: AML Mod Compiler
+
+on:
+
+  push:
+
+    branches: [ "main" ]
+
+  pull_request:
+
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - uses: actions/checkout@v3
+
+    - uses: wei/wget@v1
+
+      with:
+
+        args: -O ./AML_src.zip https://github.com/RusJJ/AndroidModLoader/archive/refs/heads/main.zip
+
+    - run: unzip ./AML_src.zip
+
+    - run: mv ./AndroidModLoader-main/mod ./mod
+
+    - run: git clone https://RusJJ:${{secrets.SECRET_TOKEN}}@github.com/RusJJ/GTASAAndroid_Structs ./structs
+
+    - run: mv ./structs/* ./
+
+    - uses: nttld/setup-ndk@v1
+
+      with:
+
+        ndk-version: r21
+
+        local-cache: true
+
+    - run: ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=./Android.mk NDK_APPLICATION_MK=./Application.mk
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: compiled-mods-zip
+        path: ./libs
