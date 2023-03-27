@@ -31,6 +31,9 @@ struct AdditionalSettingsButton
 {
     const char*        szName;
     const char*        szTextureName;
+    bool               bUsesMenu;
+    SimpleDataFn       fnButtonPressed;
+    void*              pMenuData;
 };
 
 struct AdditionalTexDB
@@ -117,6 +120,9 @@ public:
     int             AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, OnSettingDrawedFn fnOnValueDraw = NULL, void* data = NULL); // +data
     int             ScriptCommand(const SCRIPT_COMMAND *pScriptCommand, ...);
     void            AddOnRenderListener(eRenderOfType typeOf, SimpleDataFn fn);
+
+    // 1.4.1
+    void            AddSettingsTabButton(const char* name, SimpleDataFn fn, const char* textureName = "menu_mainsettings", void* data = NULL);
     
 public:
     eLoadedGame     m_eLoadedGame;

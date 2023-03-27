@@ -197,6 +197,7 @@ public:
      *
      *  \param name A name of settings tab
      *  \param textureName A name of the texture from mobile.txt texdb (def: "menu_mainsettings")
+     *  \param data A user-defined data
      *  \return An id to use with: AddButton or AddSliderItem or AddClickableItem
      */
     virtual eTypeOfSettings AddSettingsTab(const char* name, const char* textureName = "menu_mainsettings") = 0;
@@ -446,6 +447,18 @@ public:
      *  \param fn Function that will be called
      */
     virtual void AddOnRenderListener(eRenderOfType typeOf, SimpleDataFn fn) = 0;
+
+
+/* Functions below added in 1.4.1.0 */
+
+    /** Creates a custom tabs in settings (like "Mods Settings") but as a button
+     *
+     *  \param name A name of settings tab btn
+     *  \param textureName A name of the texture from mobile.txt texdb (def: "menu_mainsettings")
+     *  \param data A user-defined data
+     *  \noreturn
+     */
+    virtual void AddSettingsTabButton(const char* name, SimpleDataFn fn, const char* textureName = "menu_mainsettings", void* data = NULL) = 0;
 };
 
 #endif // _SAUTILS_INTERFACE

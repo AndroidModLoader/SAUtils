@@ -227,14 +227,15 @@ MobileMenu* OnModSettingsOpened()
 
     AddSettingsToScreen((void*)menuScreenPointer); // Custom items
 
-    ButtonSettingItem* sautilsLine = new ButtonSettingItem;
+    /*ButtonSettingItem* sautilsLine = new ButtonSettingItem;
     sautilsLine->vtable = pGameLib + 0x66281C;
     sautilsLine->itemText = "";
     sautilsLine->actionFn = (uintptr_t)None;
     sautilsLine->flag = 0;
-    AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsLine); // Empty line
+    AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsLine); // Empty line*/
 
-    *(bool*)(menuScreenPointer + 48) = true; // Ready to be shown! Or... the other thingy?
+    *(bool*)(menuScreenPointer + 48) = false; // Ready to be shown! Or... the other thingy?
+    // UPDATE: Render last at bottom
     if(gMobileMenu->m_nScreensCount)
     {
         (*(void(**)(char*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
@@ -243,6 +244,16 @@ MobileMenu* OnModSettingsOpened()
     gMobileMenu->m_pTopScreen = (MenuScreen*)menuScreenPointer;
     return gMobileMenu;
 }
+
+MobileMenu* OnCustomModSettingsOpened_NoMenu()
+{
+    nCurrentItemTab = (eTypeOfSettings)curScr->m_nChosenButton;
+    
+    gMoreSettingButtons[curScr->m_nChosenButton - 6]->fnButtonPressed(gMoreSettingButtons[curScr->m_nChosenButton - 6]->pMenuData);
+    
+    return NULL;
+}
+
 MobileMenu* OnCustomModSettingsOpened()
 {
     nCurrentItemTab = (eTypeOfSettings)curScr->m_nChosenButton;
@@ -252,14 +263,14 @@ MobileMenu* OnCustomModSettingsOpened()
 
     AddSettingsToScreen((void*)menuScreenPointer); // Custom items
 
-    ButtonSettingItem* sautilsLine = new ButtonSettingItem;
+    /*ButtonSettingItem* sautilsLine = new ButtonSettingItem;
     sautilsLine->vtable = pGameLib + 0x66281C;
     sautilsLine->itemText = "";
     sautilsLine->actionFn = (uintptr_t)None;
     sautilsLine->flag = 0;
-    AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsLine); // Empty line
+    AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsLine); // Empty line*/
 
-    *(bool*)(menuScreenPointer + 48) = true; // Ready to be shown! Or... the other thingy?
+    *(bool*)(menuScreenPointer + 48) = false; // Ready to be shown! Or... the other thingy?
     if(gMobileMenu->m_nScreensCount)
     {
         (*(void(**)(char*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
@@ -312,7 +323,8 @@ DECL_HOOK(SettingsScreen*, SettingsScreen_Construct, SettingsScreen* self)
 
     // Custom tabs!
     int size = gMoreSettingButtons.size();
-    for(int i = 0; i < size; ++i) AddSettingsButton(self, gMoreSettingButtons[i]->szName, gMoreSettingButtons[i]->szTextureName, OnCustomModSettingsOpened);
+    for(int i = 0; i < size; ++i)
+        AddSettingsButton(self, gMoreSettingButtons[i]->szName, gMoreSettingButtons[i]->szTextureName, gMoreSettingButtons[i]->bUsesMenu ? OnCustomModSettingsOpened : OnCustomModSettingsOpened_NoMenu);
     // Custom tabs!
 
     return self;
@@ -825,14 +837,16 @@ void SAUtils::AddIMG(const char* imgName)
     if(g_bIsGameStartedAlready) AddImageToList(imgName, false);
 }
 
+// 1.3
+static unsigned char nTabsIdCount = SETTINGS_COUNT-1;
 eTypeOfSettings SAUtils::AddSettingsTab(const char* name, const char* textureName)
 {
-    static unsigned char tabId = SETTINGS_COUNT-1;
     AdditionalSettingsButton* pNew = new AdditionalSettingsButton;
     pNew->szName = name;
     pNew->szTextureName = textureName;
+    pNew->bUsesMenu = true;
     gMoreSettingButtons.push_back(pNew);
-    return (eTypeOfSettings)++tabId;
+    return (eTypeOfSettings)(++nTabsIdCount);
 }
 
 unsigned int SAUtils::GetCurrentMs()
@@ -1106,6 +1120,19 @@ void SAUtils::AddOnRenderListener(eRenderOfType typeOf, SimpleDataFn fn)
 {
     if(typeOf >= RENDEROFTYPE_MAX) return;
     gRenderOfTypeFns[typeOf].push_back(fn);
+}
+
+// 1.4.1
+void SAUtils::AddSettingsTabButton(const char* name, SimpleDataFn fn, const char* textureName, void* data)
+{
+    AdditionalSettingsButton* pNew = new AdditionalSettingsButton;
+    pNew->szName = name;
+    pNew->szTextureName = textureName;
+    pNew->bUsesMenu = false;
+    pNew->pMenuData = data;
+    pNew->fnButtonPressed = fn;
+    gMoreSettingButtons.push_back(pNew);
+    ++nTabsIdCount;
 }
 
 static SAUtils sautilsLocal;

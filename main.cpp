@@ -6,7 +6,7 @@
 #include <sautils.h>
 
 /* Same name but can be used for VC too! (!!!not working currently!!!) */
-MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.4, RusJJ)
+MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.4.1, RusJJ)
 //NEEDGAME(com.rockstargames.gtasa)
 
 uintptr_t pGameLib = 0;
