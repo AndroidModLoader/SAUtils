@@ -323,8 +323,13 @@ DECL_HOOK(SettingsScreen*, SettingsScreen_Construct, SettingsScreen* self)
 
     // Custom tabs!
     int size = gMoreSettingButtons.size();
+    AdditionalSettingsButton* pBtn;
     for(int i = 0; i < size; ++i)
-        AddSettingsButton(self, gMoreSettingButtons[i]->szName, gMoreSettingButtons[i]->szTextureName, gMoreSettingButtons[i]->bUsesMenu ? OnCustomModSettingsOpened : OnCustomModSettingsOpened_NoMenu);
+    {
+        pBtn = gMoreSettingButtons[i];
+        if(pBtn->nBtnLoc == STB_Settings || pBtn->bUsesMenu)
+            AddSettingsButton(self, pBtn->szName, pBtn->szTextureName, pBtn->bUsesMenu ? OnCustomModSettingsOpened : OnCustomModSettingsOpened_NoMenu);
+    }
     // Custom tabs!
 
     return self;
@@ -592,10 +597,10 @@ void SAUtils::InitializeSAUtils()
     HOOKPLT(InitialiseGame_SecondPass,  pGameLib + 0x672178);
     HOOKPLT(PlayerProcess,              pGameLib + 0x673E84);
     HOOK(RenderEffects, aml->GetSym(pGameHandle, "_Z13RenderEffectsv"));
-    HOOK(RenderMenu, aml->GetSym(pGameHandle, "_ZN10MobileMenu6RenderEv"));
-    HOOK(RenderPed, aml->GetSym(pGameHandle, "_ZN4CPed6RenderEv"));
+    HOOK(RenderMenu,    aml->GetSym(pGameHandle, "_ZN10MobileMenu6RenderEv"));
+    HOOK(RenderPed,     aml->GetSym(pGameHandle, "_ZN4CPed6RenderEv"));
     HOOK(RenderVehicle, aml->GetSym(pGameHandle, "_ZN8CVehicle6RenderEv"));
-    HOOK(RenderObject, aml->GetSym(pGameHandle, "_ZN7CObject6RenderEv"));
+    HOOK(RenderObject,  aml->GetSym(pGameHandle, "_ZN7CObject6RenderEv"));
 
     // Hooked settings functions
     aml->Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;
@@ -655,7 +660,7 @@ void SAUtils::InitializeSAUtils()
     SET_TO(WorldPlayers,                *(void**)(pGameLib + 0x6783C8));
     
     // Crazy idea to hook everything!!1!!1!
-    HOOK(GetTextureFromDB_HOOKED,             aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
+    HOOK(GetTextureFromDB_HOOKED,       aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
     
     // Scripting
     InitializeSAScripting();
@@ -1123,7 +1128,7 @@ void SAUtils::AddOnRenderListener(eRenderOfType typeOf, SimpleDataFn fn)
 }
 
 // 1.4.1
-void SAUtils::AddSettingsTabButton(const char* name, SimpleDataFn fn, const char* textureName, void* data)
+void SAUtils::AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsTabButtonLoc loc, const char* textureName, void* data)
 {
     AdditionalSettingsButton* pNew = new AdditionalSettingsButton;
     pNew->szName = name;
@@ -1131,6 +1136,7 @@ void SAUtils::AddSettingsTabButton(const char* name, SimpleDataFn fn, const char
     pNew->bUsesMenu = false;
     pNew->pMenuData = data;
     pNew->fnButtonPressed = fn;
+    pNew->nBtnLoc = loc;
     gMoreSettingButtons.push_back(pNew);
     ++nTabsIdCount;
 }

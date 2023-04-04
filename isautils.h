@@ -105,6 +105,15 @@ enum eRenderOfType : unsigned char
     RENDEROFTYPE_MAX
 };
 
+enum eSettingsTabButtonLoc : unsigned char
+{
+    STB_MainMenu = 0,
+    STB_StartGame,
+    STB_Settings,
+    
+    TABBUTTONLOC_MAX,
+};
+
 class ISAUtils
 {
 public:
@@ -458,7 +467,7 @@ public:
      *  \param data A user-defined data
      *  \noreturn
      */
-    virtual void AddSettingsTabButton(const char* name, SimpleDataFn fn, const char* textureName = "menu_mainsettings", void* data = NULL) = 0;
+    virtual void AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsTabButtonLoc loc = STB_Settings, const char* textureName = "menu_mainsettings", void* data = NULL) = 0;
 };
 
 #endif // _SAUTILS_INTERFACE

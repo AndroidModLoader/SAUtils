@@ -33,6 +33,7 @@ struct AdditionalSettingsButton
     const char*        szTextureName;
     bool               bUsesMenu;
     SimpleDataFn       fnButtonPressed;
+    eSettingsTabButtonLoc nBtnLoc;
     void*              pMenuData;
 };
 
@@ -122,7 +123,7 @@ public:
     void            AddOnRenderListener(eRenderOfType typeOf, SimpleDataFn fn);
 
     // 1.4.1
-    void            AddSettingsTabButton(const char* name, SimpleDataFn fn, const char* textureName = "menu_mainsettings", void* data = NULL);
+    void            AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsTabButtonLoc loc = STB_Settings, const char* textureName = "menu_mainsettings", void* data = NULL);
     
 public:
     eLoadedGame     m_eLoadedGame;
