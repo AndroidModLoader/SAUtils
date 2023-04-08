@@ -208,8 +208,10 @@ DECL_HOOK(unsigned short*, GxtTextGet, void* self, const char* txt)
     }
     return ret;
 }
+
 char szSautilsVer[32];
-SettingsScreen* curScr = NULL;
+int nCurItem = 0, nCurScrItemsOffset = 0;
+FlowScreen* curScr = NULL;
 MobileMenu* OnModSettingsOpened()
 {
     nCurrentItemTab = SetType_Mods;
@@ -245,9 +247,9 @@ MobileMenu* OnModSettingsOpened()
     return gMobileMenu;
 }
 
-MobileMenu* OnCustomModSettingsOpened_NoMenu()
+MobileMenu* OnTabButtonClicked()
 {
-    nCurrentItemTab = (eTypeOfSettings)curScr->m_nChosenButton;
+    nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton - nCurScrItemsOffset);
     
     gMoreSettingButtons[curScr->m_nChosenButton - 6]->fnButtonPressed(gMoreSettingButtons[curScr->m_nChosenButton - 6]->pMenuData);
     
@@ -279,32 +281,32 @@ MobileMenu* OnCustomModSettingsOpened()
     gMobileMenu->m_pTopScreen = (MenuScreen*)menuScreenPointer;
     return gMobileMenu;
 }
-void AddSettingsButton(SettingsScreen* self, const char* name, const char* textureName, FSButtonCallback callback)
+void AddSettingsButton(FlowScreen* self, const char* name, const char* textureName, FSButtonCallback callback)
 {
     RwTexture* tex = (RwTexture*)sautils->LoadRwTextureFromPNG(textureName);
     if(!tex) tex = GetTextureFromDB(textureName);
     if(!tex) tex = GetTextureFromDB("menu_mainsettings");
     ++tex->refCount;
-    int& tabsCount = self->m_nButtonsCount;
+    unsigned int& tabsCount = self->items.Count();
     FlowScreenButton* container;
-    if(self->m_nAllocatedCount >= tabsCount + 1) // If we have a place for tabs
+    if(self->items.AllocatedCount() > tabsCount) // If we have a place for tabs
     {
-        container = self->m_pButtonsContainer;
+        container = self->items.data;
     }
     else // If we dont have a place for tabs, reallocate more
     {
         int reallocCount = 4 * (tabsCount + 1) / 3u + 3;
         FlowScreenButton* newContainer = new FlowScreenButton[reallocCount];
-        FlowScreenButton* oldContainer = self->m_pButtonsContainer;
+        FlowScreenButton* oldContainer = self->items.data;
         container = newContainer;
         if (oldContainer)
         {
-            memcpy(newContainer, self->m_pButtonsContainer, sizeof(FlowScreenButton) * tabsCount);
+            memcpy(newContainer, self->items.data, sizeof(FlowScreenButton) * tabsCount);
             free(oldContainer);
-            tabsCount = self->m_nButtonsCount;
+            tabsCount = self->items.Count();
         }
-        self->m_nAllocatedCount = reallocCount;
-        self->m_pButtonsContainer = container;
+        self->items.AllocatedCount() = reallocCount;
+        self->items.data = container;
     }
     FlowScreenButton* btn = &container[tabsCount];
     btn->m_pTexture = tex;
@@ -328,7 +330,7 @@ DECL_HOOK(SettingsScreen*, SettingsScreen_Construct, SettingsScreen* self)
     {
         pBtn = gMoreSettingButtons[i];
         if(pBtn->nBtnLoc == STB_Settings || pBtn->bUsesMenu)
-            AddSettingsButton(self, pBtn->szName, pBtn->szTextureName, pBtn->bUsesMenu ? OnCustomModSettingsOpened : OnCustomModSettingsOpened_NoMenu);
+            AddSettingsButton(self, pBtn->szName, pBtn->szTextureName, pBtn->bUsesMenu ? OnCustomModSettingsOpened : OnTabButtonClicked);
     }
     // Custom tabs!
 
@@ -543,6 +545,38 @@ DECL_HOOKv(RenderObject, void* self)
         gRenderOfTypeFns[ROfType_Object][i](self);
     }
 }
+DECL_HOOKv(MainMenuAddItems, FlowScreen* self)
+{
+    MainMenuAddItems(self);
+    nCurScrItemsOffset = self->items.Count();
+
+    // Custom tabs!
+    int size = gMoreSettingButtons.size();
+    AdditionalSettingsButton* pBtn;
+    for(int i = 0; i < size; ++i)
+    {
+        pBtn = gMoreSettingButtons[i];
+        if(pBtn->nBtnLoc == STB_MainMenu && !pBtn->bUsesMenu)
+            AddSettingsButton(self, pBtn->szName, pBtn->szTextureName, OnTabButtonClicked);
+    }
+    // Custom tabs!
+}
+DECL_HOOKv(StartGameAddItems, FlowScreen* self)
+{
+    StartGameAddItems(self);
+    nCurScrItemsOffset = self->items.Count();
+
+    // Custom tabs!
+    int size = gMoreSettingButtons.size();
+    AdditionalSettingsButton* pBtn;
+    for(int i = 0; i < size; ++i)
+    {
+        pBtn = gMoreSettingButtons[i];
+        if(pBtn->nBtnLoc == STB_StartGame && !pBtn->bUsesMenu)
+            AddSettingsButton(self, pBtn->szName, pBtn->szTextureName, OnTabButtonClicked);
+    }
+    // Custom tabs!
+}
 
 
 
@@ -596,11 +630,14 @@ void SAUtils::InitializeSAUtils()
     HOOKPLT(InitialiseRenderWare,       pGameLib + 0x66F2D0);
     HOOKPLT(InitialiseGame_SecondPass,  pGameLib + 0x672178);
     HOOKPLT(PlayerProcess,              pGameLib + 0x673E84);
-    HOOK(RenderEffects, aml->GetSym(pGameHandle, "_Z13RenderEffectsv"));
-    HOOK(RenderMenu,    aml->GetSym(pGameHandle, "_ZN10MobileMenu6RenderEv"));
-    HOOK(RenderPed,     aml->GetSym(pGameHandle, "_ZN4CPed6RenderEv"));
-    HOOK(RenderVehicle, aml->GetSym(pGameHandle, "_ZN8CVehicle6RenderEv"));
-    HOOK(RenderObject,  aml->GetSym(pGameHandle, "_ZN7CObject6RenderEv"));
+    HOOK(RenderEffects,                 aml->GetSym(pGameHandle, "_Z13RenderEffectsv"));
+    HOOK(RenderMenu,                    aml->GetSym(pGameHandle, "_ZN10MobileMenu6RenderEv"));
+    HOOK(RenderPed,                     aml->GetSym(pGameHandle, "_ZN4CPed6RenderEv"));
+    HOOK(RenderVehicle,                 aml->GetSym(pGameHandle, "_ZN8CVehicle6RenderEv"));
+    HOOK(RenderObject,                  aml->GetSym(pGameHandle, "_ZN7CObject6RenderEv"));
+    HOOK(GetTextureFromDB_HOOKED,       aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
+    HOOK(MainMenuAddItems,              aml->GetSym(pGameHandle, "_ZN14MainMenuScreen11AddAllItemsEv"));
+    HOOK(StartGameAddItems,             aml->GetSym(pGameHandle, "_ZN14MainMenuScreen11OnStartGameEv"));
 
     // Hooked settings functions
     aml->Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;
@@ -658,9 +695,6 @@ void SAUtils::InitializeSAUtils()
     SET_TO(game_FPS,                    aml->GetSym(pGameHandle, "_ZN6CTimer8game_FPSE"));
     SET_TO(orgWidgetsPtr,               aml->GetSym(pGameHandle, "_ZN15CTouchInterface10m_pWidgetsE"));
     SET_TO(WorldPlayers,                *(void**)(pGameLib + 0x6783C8));
-    
-    // Crazy idea to hook everything!!1!!1!
-    HOOK(GetTextureFromDB_HOOKED,       aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
     
     // Scripting
     InitializeSAScripting();
