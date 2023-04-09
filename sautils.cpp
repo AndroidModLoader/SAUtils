@@ -536,6 +536,7 @@ DECL_HOOKv(MainMenuAddItems, FlowScreen* self)
 {
     MainMenuAddItems(self);
     curLoc = self->m_bIsPauseScreen ? STB_Pause : STB_MainMenu;
+    curScr = self;
     nCurScrItemsOffset = self->items.Count();
 
     // Custom tabs!
@@ -552,6 +553,7 @@ DECL_HOOKv(MainMenuAddItems, FlowScreen* self)
 DECL_HOOKv(StartGameAddItems, FlowScreen* self)
 {
     StartGameAddItems(self);
+    curScr = self;
     curLoc = STB_StartGame;
     nCurScrItemsOffset = self->items.Count();
 
