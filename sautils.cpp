@@ -30,7 +30,7 @@ std::vector<SimpleDataFn>              gRenderOfTypeFns[RENDEROFTYPE_MAX];
 std::vector<AdditionalSetting*>        gMoreSettings;
 std::vector<AdditionalTexDB*>          gMoreTexDBs;
 std::vector<const char*>               gMoreIMGs;
-std::vector<AdditionalSettingsButton*> gMoreSettingButtons;
+std::vector<AdditionalSettingsButton*> gMoreSettingButtons[TABBUTTONLOC_MAX];
 int             nNextSettingNum = MODS_SETTINGS_STARTING_FROM - 1;
 int             nCurrentSliderId = 0;
 eTypeOfSettings nCurrentItemTab = SetType_Mods;
@@ -210,8 +210,9 @@ DECL_HOOK(unsigned short*, GxtTextGet, void* self, const char* txt)
 }
 
 char szSautilsVer[32];
-int nCurItem = 0, nCurScrItemsOffset = 0;
+int nCurScrItemsOffset = 0;
 FlowScreen* curScr = NULL;
+eSettingsTabButtonLoc curLoc;
 MobileMenu* OnModSettingsOpened()
 {
     nCurrentItemTab = SetType_Mods;
@@ -229,13 +230,6 @@ MobileMenu* OnModSettingsOpened()
 
     AddSettingsToScreen((void*)menuScreenPointer); // Custom items
 
-    /*ButtonSettingItem* sautilsLine = new ButtonSettingItem;
-    sautilsLine->vtable = pGameLib + 0x66281C;
-    sautilsLine->itemText = "";
-    sautilsLine->actionFn = (uintptr_t)None;
-    sautilsLine->flag = 0;
-    AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsLine); // Empty line*/
-
     *(bool*)(menuScreenPointer + 48) = false; // Ready to be shown! Or... the other thingy?
     // UPDATE: Render last at bottom
     if(gMobileMenu->m_nScreensCount)
@@ -251,34 +245,27 @@ MobileMenu* OnTabButtonClicked()
 {
     nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton - nCurScrItemsOffset);
     
-    gMoreSettingButtons[curScr->m_nChosenButton - 6]->fnButtonPressed(gMoreSettingButtons[curScr->m_nChosenButton - 6]->pMenuData);
+    gMoreSettingButtons[curLoc][nCurrentItemTab]->fnButtonPressed(gMoreSettingButtons[curLoc][nCurrentItemTab]->pMenuData);
     
     return NULL;
 }
 
 MobileMenu* OnCustomModSettingsOpened()
 {
-    nCurrentItemTab = (eTypeOfSettings)curScr->m_nChosenButton;
-    char* menuScreenPointer = new char[0x44];
-    InitializeMenuPtr((uintptr_t)menuScreenPointer, gMoreSettingButtons[curScr->m_nChosenButton - 6]->szName, true);
+    nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton - 6);
+    CharSelectScreen* menuScreenPointer = new CharSelectScreen;
+    InitializeMenuPtr((uintptr_t)menuScreenPointer, gMoreSettingButtons[STB_Settings][nCurrentItemTab]->szName, true);
     *(uintptr_t*)menuScreenPointer = pGameLib + 0x6628D0; // Vtable
 
     AddSettingsToScreen((void*)menuScreenPointer); // Custom items
 
-    /*ButtonSettingItem* sautilsLine = new ButtonSettingItem;
-    sautilsLine->vtable = pGameLib + 0x66281C;
-    sautilsLine->itemText = "";
-    sautilsLine->actionFn = (uintptr_t)None;
-    sautilsLine->flag = 0;
-    AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsLine); // Empty line*/
-
-    *(bool*)(menuScreenPointer + 48) = false; // Ready to be shown! Or... the other thingy?
+    menuScreenPointer->renderLastAtBottom = false;
     if(gMobileMenu->m_nScreensCount)
     {
-        (*(void(**)(char*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
+        (*(void(**)(MenuScreen*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
     }
     if(gMobileMenu->m_pTopScreen != NULL) ProcessMenuPending(gMobileMenu);
-    gMobileMenu->m_pTopScreen = (MenuScreen*)menuScreenPointer;
+    gMobileMenu->m_pTopScreen = menuScreenPointer;
     return gMobileMenu;
 }
 void AddSettingsButton(FlowScreen* self, const char* name, const char* textureName, FSButtonCallback callback)
@@ -324,11 +311,11 @@ DECL_HOOK(SettingsScreen*, SettingsScreen_Construct, SettingsScreen* self)
     // New "Mods" tab should be there!
 
     // Custom tabs!
-    int size = gMoreSettingButtons.size();
+    int size = gMoreSettingButtons[STB_Settings].size();
     AdditionalSettingsButton* pBtn;
     for(int i = 0; i < size; ++i)
     {
-        pBtn = gMoreSettingButtons[i];
+        pBtn = gMoreSettingButtons[STB_Settings][i];
         if(pBtn->nBtnLoc == STB_Settings || pBtn->bUsesMenu)
             AddSettingsButton(self, pBtn->szName, pBtn->szTextureName, pBtn->bUsesMenu ? OnCustomModSettingsOpened : OnTabButtonClicked);
     }
@@ -548,15 +535,16 @@ DECL_HOOKv(RenderObject, void* self)
 DECL_HOOKv(MainMenuAddItems, FlowScreen* self)
 {
     MainMenuAddItems(self);
+    curLoc = self->m_bIsPauseScreen ? STB_Pause : STB_MainMenu;
     nCurScrItemsOffset = self->items.Count();
 
     // Custom tabs!
-    int size = gMoreSettingButtons.size();
+    int size = gMoreSettingButtons[curLoc].size();
     AdditionalSettingsButton* pBtn;
     for(int i = 0; i < size; ++i)
     {
-        pBtn = gMoreSettingButtons[i];
-        if(pBtn->nBtnLoc == STB_MainMenu && !pBtn->bUsesMenu)
+        pBtn = gMoreSettingButtons[curLoc][i];
+        if(!pBtn->bUsesMenu)
             AddSettingsButton(self, pBtn->szName, pBtn->szTextureName, OnTabButtonClicked);
     }
     // Custom tabs!
@@ -564,15 +552,16 @@ DECL_HOOKv(MainMenuAddItems, FlowScreen* self)
 DECL_HOOKv(StartGameAddItems, FlowScreen* self)
 {
     StartGameAddItems(self);
+    curLoc = STB_StartGame;
     nCurScrItemsOffset = self->items.Count();
 
     // Custom tabs!
-    int size = gMoreSettingButtons.size();
+    int size = gMoreSettingButtons[STB_StartGame].size();
     AdditionalSettingsButton* pBtn;
     for(int i = 0; i < size; ++i)
     {
-        pBtn = gMoreSettingButtons[i];
-        if(pBtn->nBtnLoc == STB_StartGame && !pBtn->bUsesMenu)
+        pBtn = gMoreSettingButtons[STB_StartGame][i];
+        if(!pBtn->bUsesMenu)
             AddSettingsButton(self, pBtn->szName, pBtn->szTextureName, OnTabButtonClicked);
     }
     // Custom tabs!
@@ -884,7 +873,7 @@ eTypeOfSettings SAUtils::AddSettingsTab(const char* name, const char* textureNam
     pNew->szName = name;
     pNew->szTextureName = textureName;
     pNew->bUsesMenu = true;
-    gMoreSettingButtons.push_back(pNew);
+    gMoreSettingButtons[STB_Settings].push_back(pNew);
     return (eTypeOfSettings)(++nTabsIdCount);
 }
 
@@ -947,7 +936,7 @@ CWidgetButton* SAUtils::CreateWidget(int widgetId, int x, int y, float scale, co
        pNewWidgets[widgetId] != NULL) return NULL;
 
     CWidgetButton* widget = new CWidgetButton;
-    WidgetButton_Constructor(widget, textureName, WidgetPosition(x, y, scale), 1, 0, HIDMAP_NOTHING);
+    WidgetButton_Constructor(widget, textureName, WidgetPosition(x, y, scale), 1, 0, HID_MAPPING_UNKNOWN);
     pNewWidgets[widgetId] = widget;
 
     return widget;
@@ -1171,7 +1160,7 @@ void SAUtils::AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsT
     pNew->pMenuData = data;
     pNew->fnButtonPressed = fn;
     pNew->nBtnLoc = loc;
-    gMoreSettingButtons.push_back(pNew);
+    gMoreSettingButtons[loc].push_back(pNew);
     ++nTabsIdCount;
 }
 

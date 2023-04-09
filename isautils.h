@@ -108,6 +108,7 @@ enum eRenderOfType : unsigned char
 enum eSettingsTabButtonLoc : unsigned char
 {
     STB_MainMenu = 0,
+    STB_Pause,
     STB_StartGame,
     STB_Settings,
     
