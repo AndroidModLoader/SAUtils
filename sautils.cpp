@@ -37,9 +37,9 @@ eTypeOfSettings nCurrentItemTab = SetType_Mods;
 bool            g_bIsGameStartedAlready = false;
 
 /* Patched vars */
-int           pNewSettings[8 * MAX_SETTINGS] {0}; // A new char MobileSettings::settings[37*8*4]
-CWidget*      pNewWidgets[MAX_WIDGETS] {NULL};
-char          pNewStreamingFiles[48 * (MAX_IMG_ARCHIVES + 2)] {0}; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
+MobileSettings::Setting                pNewSettings[MAX_SETTINGS] {0}; // A new char MobileSettings::settings[37*8*4]
+CWidget*                               pNewWidgets[MAX_WIDGETS] {NULL};
+char                                   pNewStreamingFiles[48 * (MAX_IMG_ARCHIVES + 2)] {0}; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
 
 /* Funcs */
 typedef void* (*SettingsAddItemFn)(void* a1, uintptr_t a2);
@@ -152,7 +152,7 @@ DECL_HOOK(unsigned short*, AsciiToGxtChar, const char* txt, unsigned short* ret)
             {
                 if(setting->fnOnValueDraw != NULL)
                 {
-                    int val = pNewSettings[8 * nCurrentSliderId + 2];
+                    int val = pNewSettings[nCurrentSliderId].value;
                     nCurrentSliderId = 0;
                     return AsciiToGxtChar(setting->fnOnValueDraw(val, setting->pOwnData), ret);
                 }
@@ -193,7 +193,7 @@ DECL_HOOK(void, SelectScreenOnDestroy, void* self)
 DECL_HOOK(void, SettingSelectionRender, uintptr_t self, float a1, float a2, float a3, float a4, float a5, float a6)
 {
     int sliderId = *(int*)(self + 8);
-    if(sliderId >= MODS_SETTINGS_STARTING_FROM && pNewSettings[8 * sliderId + 7] == 1) nCurrentSliderId = sliderId;
+    if(sliderId >= MODS_SETTINGS_STARTING_FROM && pNewSettings[sliderId].type == MST_Range) nCurrentSliderId = sliderId;
     SettingSelectionRender(self, a1, a2, a3, a4, a5, a6);
     nCurrentSliderId = 0;
 }
@@ -739,11 +739,12 @@ int SAUtils::AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initV
     pNew->pOwnData = NULL;
     gMoreSettings.push_back(pNew);
 
-    pNewSettings[8 * nNextSettingNum + 1] = (int)switchesArray; // Items of that setting
-    pNewSettings[8 * nNextSettingNum + 2] = initVal; // Current value
-    pNewSettings[8 * nNextSettingNum + 4] = minVal; // Min slider value (min is -2millions) OR min count of items (keep it 0 maybe, if u dont need others)
-    pNewSettings[8 * nNextSettingNum + 5] = maxVal; // Max slider value (max is 2millions) OR max count-1 of items
-    pNewSettings[8 * nNextSettingNum + 7] = isSlider?1:0; // Declare it as a slider (flags???)
+    pNewSettings[nNextSettingNum].values = (const char**)switchesArray; // Items of that setting
+    pNewSettings[nNextSettingNum].value = initVal; // Current value
+    pNewSettings[nNextSettingNum].defaultValue = initVal;
+    pNewSettings[nNextSettingNum].min = minVal; // Min slider value (min is -2millions) OR min count of items (keep it 0 maybe, if u dont need others)
+    pNewSettings[nNextSettingNum].max = maxVal; // Max slider value (max is 2millions) OR max count-1 of items
+    pNewSettings[nNextSettingNum].type = isSlider ? MST_Range : MST_Toggle; // Declare it as a slider (flags???)
 
     return nNextSettingNum;
 }
@@ -751,7 +752,7 @@ int SAUtils::AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initV
 int SAUtils::ValueOfSettingsItem(int settingId)
 {
     if(settingId < 0 || settingId > nNextSettingNum) return 0;
-    return pNewSettings[8 * settingId + 2];
+    return pNewSettings[settingId].value;
 }
 
 // 1.1
@@ -779,11 +780,12 @@ int SAUtils::AddClickableItem(eTypeOfSettings typeOf, const char* name, int init
     pNew->pOwnData = data;
     gMoreSettings.push_back(pNew);
 
-    pNewSettings[8 * nNextSettingNum + 1] = (int)switchesArray;
-    pNewSettings[8 * nNextSettingNum + 2] = initVal;
-    pNewSettings[8 * nNextSettingNum + 4] = minVal;
-    pNewSettings[8 * nNextSettingNum + 5] = maxVal;
-    pNewSettings[8 * nNextSettingNum + 7] = 0;
+    pNewSettings[nNextSettingNum].values = switchesArray;
+    pNewSettings[nNextSettingNum].value = initVal;
+    pNewSettings[nNextSettingNum].defaultValue = initVal;
+    pNewSettings[nNextSettingNum].min = minVal;
+    pNewSettings[nNextSettingNum].max = maxVal;
+    pNewSettings[nNextSettingNum].type = MST_Toggle;
 
     return nNextSettingNum;
 }
@@ -811,11 +813,12 @@ int SAUtils::AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal
     pNew->pOwnData = data;
     gMoreSettings.push_back(pNew);
 
-    pNewSettings[8 * nNextSettingNum + 1] = (int)NULL;
-    pNewSettings[8 * nNextSettingNum + 2] = initVal;
-    pNewSettings[8 * nNextSettingNum + 4] = minVal;
-    pNewSettings[8 * nNextSettingNum + 5] = maxVal;
-    pNewSettings[8 * nNextSettingNum + 7] = 1;
+    pNewSettings[nNextSettingNum].values = NULL;
+    pNewSettings[nNextSettingNum].value = initVal;
+    pNewSettings[nNextSettingNum].defaultValue = initVal;
+    pNewSettings[nNextSettingNum].min = minVal;
+    pNewSettings[nNextSettingNum].max = maxVal;
+    pNewSettings[nNextSettingNum].type = MST_Range;
 
     return nNextSettingNum;
 }
@@ -856,7 +859,7 @@ uintptr_t* SAUtils::AddTextureDB(const char* name, bool registerMe)
 
 int* SAUtils::GetSettingValuePointer(int settingId)
 {
-    return &pNewSettings[8 * nNextSettingNum + 2];
+    return &pNewSettings[nNextSettingNum].value;
 }
 
 void SAUtils::AddIMG(const char* imgName)
