@@ -42,10 +42,10 @@ CWidget*                               pNewWidgets[MAX_WIDGETS] {NULL};
 char                                   pNewStreamingFiles[48 * (MAX_IMG_ARCHIVES + 2)] {0}; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
 
 /* Funcs */
-typedef void* (*SettingsAddItemFn)(void* a1, uintptr_t a2);
+typedef void* (*SettingsAddItemFn)(SelectScreen* a1, SelectScreen::MenuSelection* a2);
 RwTexture*    (*GetTextureFromDB)(const char*);
 uintptr_t     (*ProcessMenuPending)(MobileMenu* mobilemenu);
-void          (*InitializeMenuPtr)(uintptr_t mobileMenuPtr, const char* topname, bool isCreatedNowMaybeIdk);
+void          (*InitializeMenuPtr)(SelectScreen* mobileMenuPtr, const char* topname, bool isCreatedNowMaybeIdk);
 uintptr_t     (*LoadTextureDB)(const char* dbFile, bool fullLoad, int txdbFormat);
 uintptr_t     (*GetTexDB)(const char* dbName);
 void          (*RegisterTexDB)(uintptr_t dbPtr);
@@ -83,22 +83,23 @@ SettingsAddItemFn AddSettingsItemFn;
 MobileMenu *gMobileMenu;
 CPlayerInfo *WorldPlayers;
 unsigned short* gxtErrorString;
-uintptr_t OnRestoreDefaultsFn, OnRestoreDefaultsAudioFn;
+void (*OnRestoreDefaultsFn)(SelectScreen*, int);
+void (*OnRestoreDefaultsAudioFn)(SelectScreen*, int);
 unsigned int* m_snTimeInMilliseconds;
 float* game_FPS;
 CWidget** orgWidgetsPtr;
 
 /* SAUtils */
-void AddRestoreDefaultsItem(void* screen, bool isAudio = false)
+void AddRestoreDefaultsItem(SelectScreen* screen, bool isAudio = false)
 {
-    ButtonSettingItem* mob_rtd = new ButtonSettingItem;
+    SelectScreen::ActionSelection* mob_rtd = new SelectScreen::ActionSelection;
     mob_rtd->vtable = pGameLib + 0x66281C;
-    mob_rtd->itemText = "MOB_RTD";
-    mob_rtd->actionFn = isAudio ? OnRestoreDefaultsAudioFn : OnRestoreDefaultsFn;
-    mob_rtd->flag = 0;
-    AddSettingsItemFn(screen, (uintptr_t)mob_rtd);
+    mob_rtd->tag = "MOB_RTD";
+    mob_rtd->OnSelect = isAudio ? OnRestoreDefaultsAudioFn : OnRestoreDefaultsFn;
+    mob_rtd->data = 0;
+    AddSettingsItemFn(screen, mob_rtd);
 }
-void AddSettingsToScreen(void* screen)
+void AddSettingsToScreen(SelectScreen* screen)
 {
     int size = gMoreSettings.size();
     for(int i = 0; i < size; ++i)
@@ -108,21 +109,22 @@ void AddSettingsToScreen(void* screen)
         {
             if(setting->byteItemType == ItemType_Button)
             {
-                ButtonSettingItem* mob_rtd = new ButtonSettingItem;
+                SelectScreen::ActionSelection* mob_rtd = new SelectScreen::ActionSelection;
                 mob_rtd->vtable = pGameLib + 0x66281C;
-                mob_rtd->itemText = setting->szName;
-                mob_rtd->actionFn = setting->fnOnButtonPressed == NULL ? (uintptr_t)None : (uintptr_t)setting->fnOnButtonPressed;
-                mob_rtd->flag = 0;
-                AddSettingsItemFn(screen, (uintptr_t)mob_rtd);
+                mob_rtd->tag = setting->szName;
+                mob_rtd->OnSelect = setting->fnOnButtonPressed == NULL ? (void(*)(SelectScreen*,int))None : (void(*)(SelectScreen*,int))setting->fnOnButtonPressed;
+                mob_rtd->data = 0;
+                AddSettingsItemFn(screen, mob_rtd);
             }
             else
             {
-                uintptr_t menuItem = (uintptr_t)(new char[0x1Cu]);
-                *(uintptr_t*)menuItem = pGameLib + 0x662848;
-                *(const char**)(menuItem + 4) = setting->szName;
-                *(int*)(menuItem + 8) = setting->nSettingId;
-                *(int*)(menuItem + 12) = 0;
-                *(int*)(menuItem + 16) = 0;
+                SelectScreen::SettingSelection* menuItem = new SelectScreen::SettingSelection;
+                menuItem->vtable = pGameLib + 0x662848;
+                menuItem->tag = setting->szName;
+                menuItem->forSetting = (MobileSetting)setting->nSettingId;
+                menuItem->curMoveReq = 0.0f;
+                menuItem->sliderX1 = 0.0f;
+                menuItem->sliderX2 = 0.0f;
                 AddSettingsItemFn(screen, menuItem);
             }
         }
@@ -217,27 +219,27 @@ MobileMenu* OnModSettingsOpened()
 {
     nCurrentItemTab = SetType_Mods;
     snprintf(szSautilsVer, sizeof(szSautilsVer), "SAUtils v%s", modinfo->VersionString());
-    char* menuScreenPointer = new char[0x44];
-    InitializeMenuPtr((uintptr_t)menuScreenPointer, "Mods Settings", true);
-    *(uintptr_t*)menuScreenPointer = pGameLib + 0x6628D0; // Vtable
+    CharSelectScreen* menuScreenPointer = new CharSelectScreen;
+    InitializeMenuPtr(menuScreenPointer, "Mods Settings", true);
+    menuScreenPointer->vtable = pGameLib + 0x6628D0; // Vtable
 
-    ButtonSettingItem* sautilsVer = new ButtonSettingItem;
+    SelectScreen::ActionSelection* sautilsVer = new SelectScreen::ActionSelection;
     sautilsVer->vtable = pGameLib + 0x66281C;
-    sautilsVer->itemText = szSautilsVer;
-    sautilsVer->actionFn = (uintptr_t)None;
-    sautilsVer->flag = 0;
-    AddSettingsItemFn((void*)menuScreenPointer, (uintptr_t)sautilsVer); // SAUtils version
+    sautilsVer->tag = szSautilsVer;
+    sautilsVer->OnSelect = (void(*)(SelectScreen*,int))None;
+    sautilsVer->data = 0;
+    AddSettingsItemFn(menuScreenPointer, sautilsVer); // SAUtils version
 
-    AddSettingsToScreen((void*)menuScreenPointer); // Custom items
+    AddSettingsToScreen(menuScreenPointer); // Custom items
 
-    *(bool*)(menuScreenPointer + 48) = false; // Ready to be shown! Or... the other thingy?
-    // UPDATE: Render last at bottom
-    if(gMobileMenu->m_nScreensCount)
+    menuScreenPointer->renderLastAtBottom = false;
+    
+    if(gMobileMenu->m_nScreensCount > 0)
     {
-        (*(void(**)(char*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
+        (*(void(**)(SelectScreen*, int))(menuScreenPointer->vtable + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
     }
     if(gMobileMenu->m_pTopScreen != NULL) ProcessMenuPending(gMobileMenu);
-    gMobileMenu->m_pTopScreen = (MenuScreen*)menuScreenPointer;
+    gMobileMenu->m_pTopScreen = menuScreenPointer;
     return gMobileMenu;
 }
 
@@ -254,10 +256,10 @@ MobileMenu* OnCustomModSettingsOpened()
 {
     nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton - 6);
     CharSelectScreen* menuScreenPointer = new CharSelectScreen;
-    InitializeMenuPtr((uintptr_t)menuScreenPointer, gMoreSettingButtons[STB_Settings][nCurrentItemTab]->szName, true);
-    *(uintptr_t*)menuScreenPointer = pGameLib + 0x6628D0; // Vtable
+    InitializeMenuPtr(menuScreenPointer, gMoreSettingButtons[STB_Settings][nCurrentItemTab]->szName, true);
+    menuScreenPointer->vtable = pGameLib + 0x6628D0; // Vtable
 
-    AddSettingsToScreen((void*)menuScreenPointer); // Custom items
+    AddSettingsToScreen(menuScreenPointer); // Custom items
 
     menuScreenPointer->renderLastAtBottom = false;
     if(gMobileMenu->m_nScreensCount)
@@ -383,25 +385,25 @@ DECL_HOOKv(PlayerProcess, CPlayerInfo* self, uint32_t playerIndex)
 
 uintptr_t NewScreen_Controls_backto, NewScreen_Game_backto, NewScreen_Display_backto, NewScreen_Audio_backto;
 uintptr_t DrawSlider_backto;
-extern "C" void NewScreen_Controls_inject(void* self)
+extern "C" void NewScreen_Controls_inject(SelectScreen* self)
 {
     nCurrentItemTab = SetType_Controller;
     AddSettingsToScreen(self);
     AddRestoreDefaultsItem(self);
 }
-extern "C" void NewScreen_Game_inject(void* self)
+extern "C" void NewScreen_Game_inject(SelectScreen* self)
 {
     nCurrentItemTab = SetType_Game;
     AddSettingsToScreen(self);
     AddRestoreDefaultsItem(self);
 }
-extern "C" void NewScreen_Display_inject(void* self)
+extern "C" void NewScreen_Display_inject(SelectScreen* self)
 {
     nCurrentItemTab = SetType_Display;
     AddSettingsToScreen(self);
     AddRestoreDefaultsItem(self);
 }
-extern "C" void NewScreen_Audio_inject(void* self)
+extern "C" void NewScreen_Audio_inject(SelectScreen* self)
 {
     nCurrentItemTab = SetType_Audio;
     AddSettingsToScreen(self);
@@ -437,7 +439,7 @@ __attribute__((optnone)) __attribute__((naked)) void NewScreen_Audio_stub(void)
     asm("POP {R0}\nBX R12");
 }
 
-DECL_HOOK(void*, NewScreen_Language, void* self)
+DECL_HOOK(void*, NewScreen_Language, SelectScreen* self)
 {
     nCurrentItemTab = SetType_Language;
     NewScreen_Language(self);

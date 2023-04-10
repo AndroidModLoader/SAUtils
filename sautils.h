@@ -44,26 +44,6 @@ struct AdditionalTexDB
     uintptr_t          nDBPointer;
 };
 
-struct ButtonSettingItem
-{
-    uintptr_t          vtable;
-    const char*        itemText;
-    uintptr_t          actionFn;
-    int                flag;
-};
-
-struct SettingItem
-{
-    uintptr_t          vtable;
-    const char**       itemsArray;
-    int                initialValue;
-    int                unk2;
-    int                minValue;
-    int                maxValue;
-    int                unk3;
-    int                isSlider;
-};
-
 class SAUtils : public ISAUtils
 {
 public:
