@@ -39,7 +39,7 @@ bool            g_bIsGameStartedAlready = false;
 /* Patched vars */
 MobileSettings::Setting                pNewSettings[MAX_SETTINGS] {0}; // A new char MobileSettings::settings[37*8*4]
 CWidget*                               pNewWidgets[MAX_WIDGETS] {NULL};
-char                                   pNewStreamingFiles[48 * (MAX_IMG_ARCHIVES + 2)] {0}; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
+CStreamingFile                         pNewStreamingFiles[MAX_IMG_ARCHIVES + 2] {0}; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
 
 /* Funcs */
 typedef void* (*SettingsAddItemFn)(SelectScreen* a1, SelectScreen::MenuSelection* a2);
@@ -192,9 +192,9 @@ DECL_HOOK(void, SelectScreenOnDestroy, void* self)
     SettingsScreenClosed();
     SelectScreenOnDestroy(self);
 }
-DECL_HOOK(void, SettingSelectionRender, uintptr_t self, float a1, float a2, float a3, float a4, float a5, float a6)
+DECL_HOOK(void, SettingSelectionRender, SelectScreen::SettingSelection* self, float a1, float a2, float a3, float a4, float a5, float a6)
 {
-    int sliderId = *(int*)(self + 8);
+    int sliderId = (int)self->forSetting;
     if(sliderId >= MODS_SETTINGS_STARTING_FROM && pNewSettings[sliderId].type == MST_Range) nCurrentSliderId = sliderId;
     SettingSelectionRender(self, a1, a2, a3, a4, a5, a6);
     nCurrentSliderId = 0;
@@ -276,32 +276,11 @@ void AddSettingsButton(FlowScreen* self, const char* name, const char* textureNa
     if(!tex) tex = GetTextureFromDB(textureName);
     if(!tex) tex = GetTextureFromDB("menu_mainsettings");
     ++tex->refCount;
-    unsigned int& tabsCount = self->items.Count();
-    FlowScreenButton* container;
-    if(self->items.AllocatedCount() > tabsCount) // If we have a place for tabs
-    {
-        container = self->items.data;
-    }
-    else // If we dont have a place for tabs, reallocate more
-    {
-        int reallocCount = 4 * (tabsCount + 1) / 3u + 3;
-        FlowScreenButton* newContainer = new FlowScreenButton[reallocCount];
-        FlowScreenButton* oldContainer = self->items.data;
-        container = newContainer;
-        if (oldContainer)
-        {
-            memcpy(newContainer, self->items.data, sizeof(FlowScreenButton) * tabsCount);
-            free(oldContainer);
-            tabsCount = self->items.Count();
-        }
-        self->items.AllocatedCount() = reallocCount;
-        self->items.data = container;
-    }
-    FlowScreenButton* btn = &container[tabsCount];
+
+    FlowScreenButton* btn = self->items.AllocNew();
     btn->m_pTexture = tex;
     btn->m_szName = name;
     btn->m_pOnPressed = callback;
-    ++tabsCount;
 }
 DECL_HOOK(SettingsScreen*, SettingsScreen_Construct, SettingsScreen* self)
 {
@@ -357,7 +336,6 @@ DECL_HOOKv(InitialiseGame_SecondPass)
     while(vStart != vEnd)
     {
         AddImageToList(*vStart, false);
-        logger->Info("Loaded IMG %s", *vStart);
         ++vStart;
     }
     g_bIsGameStartedAlready = true;
@@ -374,8 +352,6 @@ DECL_HOOKv(PlayerProcess, CPlayerInfo* self, uint32_t playerIndex)
 
         size = gPlayerUpdatePostFns.size();
         for(int i = 0; i < size; ++i) gPlayerUpdatePostFns[i]((uintptr_t)self);
-
-        return;
     }
     else
     {
@@ -459,15 +435,15 @@ __attribute__((optnone)) __attribute__((naked)) void DrawSlider_stub(void)
     asm("POP {R0}\nBX R12");
 }
 
-int AddImageToListPatched(const char* imgName, bool isPlayerImg)
+int AddImageToListPatched(const char* imgName, bool registerIt)
 {
     for(unsigned char i = 0; i < (MAX_IMG_ARCHIVES + 2); ++i)
     {
-        if(pNewStreamingFiles[48 * i + 0] == '\0')
+        if(pNewStreamingFiles[i].m_name[0] == '\0')
         {
-            strcpy(&pNewStreamingFiles[48 * i + 0], imgName);
-            pNewStreamingFiles[48 * i + 40] = isPlayerImg;
-            *(int*)(&pNewStreamingFiles[48 * i + 44]) = CdStreamOpen(imgName, false);
+            strncpy((char*)pNewStreamingFiles[i].m_name, imgName, 40);
+            pNewStreamingFiles[i].m_bRegister = registerIt;
+            pNewStreamingFiles[i].m_lsn = CdStreamOpen(imgName, false);
             return i;
         }
     }
@@ -485,7 +461,6 @@ DECL_HOOK(void*, GetTextureFromDB_HOOKED, const char* texName)
     }
     
     RwTexture* tex = (RwTexture*)GetTextureFromDB_HOOKED(texName);
-    //if(tex) logger->Info("%s (%s) %d 0x%08X 0x%08X 0x%08X", texName, tex->raster->texdbInfo->unk1, (int)tex->raster->cType, (int)tex->raster->cFlags, (int)tex->raster->privateFlags, (int)tex->raster->texdbFlags);
     return tex;
 }
 
