@@ -76,7 +76,26 @@ RwImage*      (*RtBMPImageRead)(const char* filename);
 void          (*RwImageFindRasterFormat)(RwImage*, int, int*, int*, int*, int*);
 RwRaster*     (*RwRasterCreate)(int, int, int, int);
 void          (*RwRasterSetFromImage)(RwRaster*, RwImage*);
-void          (*RwImageDestroy)(RwImage*);
+void          (*RwImageDestroy)(RwImage*);RwStream* (*RwStreamOpen)(int, int, const char*);
+bool          (*RwStreamFindChunk)(RwStream*, int, int, int);
+RpClump*      (*RpClumpStreamRead)(RwStream*);
+void          (*RwStreamClose)(RwStream*, int);
+RpAtomic*     (*GetFirstAtomic)(RpClump*);
+void          (*SetFilterModeOnAtomicsTextures)(RpAtomic*, int);
+void          (*RpGeometryLock)(RpGeometry*, int);
+void          (*RpGeometryUnlock)(RpGeometry*);
+void          (*RpGeometryForAllMaterials)(RpGeometry*, RpMaterial* (*)(RpMaterial*, RwRGBA&), RwRGBA&);
+void          (*RpMaterialSetTexture)(RpMaterial*, RwTexture*);
+RpAtomic*     (*RpAtomicClone)(RpAtomic*);
+void          (*RpClumpDestroy)(RpClump*);
+RwFrame*      (*RwFrameCreate)();
+void          (*RpAtomicSetFrame)(RpAtomic*, RwFrame*);
+void          (*RenderAtomicWithAlpha)(RpAtomic*, int alphaVal);
+RpGeometry*   (*RpGeometryCreate)(int, int, unsigned int); //
+RpMaterial*   (*RpGeometryTriangleGetMaterial)(RpGeometry*, RpTriangle*); //
+void          (*RpGeometryTriangleSetMaterial)(RpGeometry*, RpTriangle*, RpMaterial*); //
+void          (*RpAtomicSetGeometry)(RpAtomic*, RpGeometry*, unsigned int);
+RpAtomicCallBackRender AtomicDefaultRenderCallBack;
 
 /* GTASA Pointers */
 SettingsAddItemFn AddSettingsItemFn;
@@ -545,7 +564,24 @@ DECL_HOOKv(StartGameAddItems, FlowScreen* self)
     }
     // Custom tabs!
 }
+bool GeometrySetPrelitConstantColor(RpGeometry* geometry, CRGBA clr)
+{
+    if((geometry->flags & rpGEOMETRYPRELIT) == 0) return false;
+    RpGeometryLock(geometry, 4095);
 
+    RwRGBA* prelitClrPtr = geometry->preLitLum;
+    if(prelitClrPtr)
+    {
+        RwInt32 numOfPrelits = geometry->numVertices;
+        if(numOfPrelits)
+        {
+            memset(prelitClrPtr, clr.val, numOfPrelits * sizeof(RwRGBA));
+        }
+    }
+    
+    RpGeometryUnlock(geometry);
+    return true;
+}
 
 
 
@@ -656,6 +692,27 @@ void SAUtils::InitializeSAUtils()
     SET_TO(Touch_IsWidgetSwipedRight,   aml->GetSym(pGameHandle, "_ZN15CTouchInterface13IsSwipedRightENS_9WidgetIDsEi"));
     SET_TO(Touch_IsWidgetSwipedUp,      aml->GetSym(pGameHandle, "_ZN15CTouchInterface10IsSwipedUpENS_9WidgetIDsEi"));
     SET_TO(Touch_IsWidgetSwipedDown,    aml->GetSym(pGameHandle, "_ZN15CTouchInterface12IsSwipedDownENS_9WidgetIDsEi"));
+
+    SET_TO(RwStreamOpen,                aml->GetSym(pGameHandle, "_Z12RwStreamOpen12RwStreamType18RwStreamAccessTypePKv"));
+    SET_TO(RwStreamFindChunk,           aml->GetSym(pGameHandle, "_Z17RwStreamFindChunkP8RwStreamjPjS1_"));
+    SET_TO(RpClumpStreamRead,           aml->GetSym(pGameHandle, "_Z17RpClumpStreamReadP8RwStream"));
+    SET_TO(RwStreamClose,               aml->GetSym(pGameHandle, "_Z13RwStreamCloseP8RwStreamPv"));
+    SET_TO(GetFirstAtomic,              aml->GetSym(pGameHandle, "_Z14GetFirstAtomicP7RpClump"));
+    SET_TO(SetFilterModeOnAtomicsTextures, aml->GetSym(pGameHandle, "_Z30SetFilterModeOnAtomicsTexturesP8RpAtomic19RwTextureFilterMode"));
+    SET_TO(RpGeometryLock,              aml->GetSym(pGameHandle, "_Z14RpGeometryLockP10RpGeometryi"));
+    SET_TO(RpGeometryUnlock,            aml->GetSym(pGameHandle, "_Z16RpGeometryUnlockP10RpGeometry"));
+    SET_TO(RpGeometryForAllMaterials,   aml->GetSym(pGameHandle, "_Z25RpGeometryForAllMaterialsP10RpGeometryPFP10RpMaterialS2_PvES3_"));
+    SET_TO(RpMaterialSetTexture,        aml->GetSym(pGameHandle, "_Z20RpMaterialSetTextureP10RpMaterialP9RwTexture"));
+    SET_TO(RpAtomicClone,               aml->GetSym(pGameHandle, "_Z13RpAtomicCloneP8RpAtomic"));
+    SET_TO(RpClumpDestroy,              aml->GetSym(pGameHandle, "_Z14RpClumpDestroyP7RpClump"));
+    SET_TO(RwFrameCreate,               aml->GetSym(pGameHandle, "_Z13RwFrameCreatev"));
+    SET_TO(RpAtomicSetFrame,            aml->GetSym(pGameHandle, "_Z16RpAtomicSetFrameP8RpAtomicP7RwFrame"));
+    SET_TO(RenderAtomicWithAlpha,       aml->GetSym(pGameHandle, "_ZN18CVisibilityPlugins21RenderAtomicWithAlphaEP8RpAtomici"));
+    SET_TO(RpGeometryCreate,            aml->GetSym(pGameHandle, "_Z16RpGeometryCreateiij"));
+    SET_TO(RpGeometryTriangleGetMaterial, aml->GetSym(pGameHandle, "_Z29RpGeometryTriangleGetMaterialPK10RpGeometryPK10RpTriangle"));
+    SET_TO(RpGeometryTriangleSetMaterial, aml->GetSym(pGameHandle, "_Z29RpGeometryTriangleSetMaterialP10RpGeometryP10RpTriangleP10RpMaterial"));
+    SET_TO(RpAtomicSetGeometry,         aml->GetSym(pGameHandle, "_Z19RpAtomicSetGeometryP8RpAtomicP10RpGeometryj"));
+    SET_TO(AtomicDefaultRenderCallBack, aml->GetSym(pGameHandle, "_Z27AtomicDefaultRenderCallBackP8RpAtomic"));
 
     SET_TO(gxtErrorString,              aml->GetSym(pGameHandle, "GxtErrorString"));
     SET_TO(gMobileMenu,                 aml->GetSym(pGameHandle, "gMobileMenu"));
@@ -1144,6 +1201,34 @@ void SAUtils::AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsT
     pNew->nBtnLoc = loc;
     gMoreSettingButtons[loc].push_back(pNew);
     ++nTabsIdCount;
+}
+
+bool SAUtils::LoadDFF(const char* name, bool doPrelit, RpAtomic** atomic, RwFrame** frame)
+{
+    RpClump* clump = NULL;
+    RwStream* stream = RwStreamOpen(2, 1, name);
+    if(!stream || !RwStreamFindChunk(stream, 16, 0, 0)) return false;
+    clump = RpClumpStreamRead(stream);
+    RwStreamClose(stream, 0);
+    if(!clump) return false;
+
+    RpAtomic* FirstAtomic = GetFirstAtomic(clump);
+    if(!FirstAtomic) return false;
+    //SetFilterModeOnAtomicsTextures(FirstAtomic, 4);
+
+    if(doPrelit) GeometrySetPrelitConstantColor(FirstAtomic->geometry, rgbaWhite);
+
+    RpAtomic* ClonedAtomic = RpAtomicClone(FirstAtomic);
+    RwFrame* mdlFrame = RwFrameCreate();
+
+    RpClumpDestroy(clump);
+    RpAtomicSetFrame(ClonedAtomic, mdlFrame);
+    ClonedAtomic->renderCallBack = AtomicDefaultRenderCallBack;
+
+    if(atomic) *atomic = ClonedAtomic;
+    if(frame) *frame = mdlFrame;
+
+    return true;
 }
 
 static SAUtils sautilsLocal;

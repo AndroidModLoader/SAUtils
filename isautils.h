@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include "sa_scripting.h"
 
+/* Just a class declarations */
+class CWidgetButton;
+class RpAtomic;
+class RwFrame;
+
+/* Type definitions */
 typedef void        (*OnSettingChangedFn)(int nOldValue, int nNewValue, void* pData); // Has pData since v1.4
 typedef const char* (*OnSettingDrawedFn) (int nNewValue, void* pData);
 typedef void        (*OnButtonPressedFn) (uintptr_t screen); // "screen" is just a pointer of SelectScreen if you need it...
@@ -12,12 +18,12 @@ typedef void*       (*LookingForTextureFn)(const char* name);
 typedef void        (*SimpleFn)();
 typedef void        (*SimpleDataFn)(void* data);
 
+/* !!! UNCHANGEABLE VALUES !!! */
 #define MAX_IMG_ARCHIVES                    32 // Def. is 6
-
 #define MAX_WIDGETS_GAME                    190
 #define MAX_WIDGETS                         0xFF
-class CWidgetButton;
 
+/* Settings "shortcuts" */
 // Controllers
 #define SETITEM_SA_TOUCH_LAYOUT             9
 #define SETITEM_SA_TOUCH_STEERING           3
@@ -57,7 +63,7 @@ class CWidgetButton;
 #define SETITEM_SA_RADIO_AUTOTUNE           13
 #define SETITEM_SA_CURRENT_RADIO            14
 
-
+/* Enumerations */
 enum eTypeOfSettings : unsigned char
 {
     SetType_Controller = 0,
@@ -115,6 +121,7 @@ enum eSettingsTabButtonLoc : unsigned char
     TABBUTTONLOC_MAX,
 };
 
+/* Interface */
 class ISAUtils
 {
 public:
@@ -469,6 +476,16 @@ public:
      *  \noreturn
      */
     virtual void AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsTabButtonLoc loc = STB_Settings, const char* textureName = "menu_mainsettings", void* data = NULL) = 0;
+
+    /** Loads a DLL file from the folder
+     *
+     *  \param name A name of settings tab btn
+     *  \param doPrelit Do a prelit process if there's no prelit info in a model (def: false)
+     *  \param atomic Save RpAtomic struct to this pointer (def: null)
+     *  \param frame Save RwFrame struct to this pointer (def: null)
+     *  \return If this process was successful
+     */
+    virtual bool LoadDFF(const char* name, bool doPrelit = false, RpAtomic** atomic = NULL, RwFrame** frame = NULL) = 0;
 };
 
 #endif // _SAUTILS_INTERFACE

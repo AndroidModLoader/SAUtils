@@ -104,7 +104,8 @@ public:
 
     // 1.4.1
     void            AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsTabButtonLoc loc = STB_Settings, const char* textureName = "menu_mainsettings", void* data = NULL);
-    
+    bool            LoadDFF(const char* name, bool doPrelit = false, RpAtomic** atomic = NULL, RwFrame** frame = NULL);
+
 public:
     eLoadedGame     m_eLoadedGame;
     uintptr_t       m_pHasFLA;
