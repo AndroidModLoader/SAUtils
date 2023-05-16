@@ -81,6 +81,16 @@ typedef void        (*SimpleDataFn)(void* data);
 #define SETITEM_SA_CURRENT_RADIO            14
 
 /* Enumerations */
+enum eLoadedGame
+{
+    Unknown = 0,
+    GTASA_2_00,
+    GTAVC_1_09,
+    GTA3_1_09,
+    GTALCS_1_09,
+    GTASA_2_10,
+};
+
 enum eTypeOfSettings : unsigned char
 {
     SetType_Controller = 0,
@@ -503,6 +513,18 @@ public:
      *  \return If this process was successful
      */
     virtual bool LoadDFF(const char* name, bool doPrelit = false, RpAtomic** atomic = NULL, RwFrame** frame = NULL) = 0;
+
+    /** Gets the loaded game Enumeration (how did i forget that?!)
+     *
+     *  \return The enum which tells you about the loaded game!
+     */
+    virtual eLoadedGame GetLoadedGame() = 0;
+
+    /** Gets the loaded game lib addr (how did i forget that?!)
+     *
+     *  \return The game library address
+     */
+    virtual uintptr_t GetLoadedGameLibAddress() = 0;
 };
 
 #endif // _SAUTILS_INTERFACE

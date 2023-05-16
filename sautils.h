@@ -1,16 +1,9 @@
+#pragma once
+
 #include <isautils.h>
 
 #define MODS_SETTINGS_STARTING_FROM  37
 #define MAX_SETTINGS                 1200
-
-enum eLoadedGame
-{
-    Unknown =     0,
-    GTASA_2_00 =  1,
-    GTAVC_1_09 =  2, // Not works currently and idk what to do
-    GTA3_1_09 =   3, // Not works currently and idk what to do
-    GTALCS_1_09 = 4, // Not works currently and idk what to do
-};
 
 struct AdditionalSetting
 {
@@ -49,6 +42,7 @@ class SAUtils : public ISAUtils
 public:
     SAUtils() : m_eLoadedGame(Unknown) {}
 
+    void            InitializeFunctions();
     void            InitializeSAUtils();
     void            InitializeVCUtils();
 
@@ -105,6 +99,8 @@ public:
     // 1.4.1
     void            AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsTabButtonLoc loc = STB_Settings, const char* textureName = "menu_mainsettings", void* data = NULL);
     bool            LoadDFF(const char* name, bool doPrelit = false, RpAtomic** atomic = NULL, RwFrame** frame = NULL);
+    eLoadedGame     GetLoadedGame();
+    uintptr_t       GetLoadedGameLibAddress();
 
 public:
     eLoadedGame     m_eLoadedGame;
