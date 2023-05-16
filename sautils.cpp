@@ -96,6 +96,7 @@ RpMaterial*   (*RpGeometryTriangleGetMaterial)(RpGeometry*, RpTriangle*); //
 void          (*RpGeometryTriangleSetMaterial)(RpGeometry*, RpTriangle*, RpMaterial*); //
 void          (*RpAtomicSetGeometry)(RpAtomic*, RpGeometry*, unsigned int);
 RpAtomicCallBackRender AtomicDefaultRenderCallBack;
+FSButtonCallback OnMainMenuExit;
 
 /* GTASA Pointers */
 SettingsAddItemFn AddSettingsItemFn;
@@ -544,6 +545,7 @@ DECL_HOOKv(MainMenuAddItems, FlowScreen* self)
         if(!pBtn->bUsesMenu)
             AddSettingsButton(self, pBtn->szName, pBtn->szTextureName, OnTabButtonClicked);
     }
+    AddSettingsButton(self, "FEP_QUI", "menu_mainquit", OnMainMenuExit); // Bring back "EXIT" button
     // Custom tabs!
 }
 DECL_HOOKv(StartGameAddItems, FlowScreen* self)
@@ -713,6 +715,7 @@ void SAUtils::InitializeSAUtils()
     SET_TO(RpGeometryTriangleSetMaterial, aml->GetSym(pGameHandle, "_Z29RpGeometryTriangleSetMaterialP10RpGeometryP10RpTriangleP10RpMaterial"));
     SET_TO(RpAtomicSetGeometry,         aml->GetSym(pGameHandle, "_Z19RpAtomicSetGeometryP8RpAtomicP10RpGeometryj"));
     SET_TO(AtomicDefaultRenderCallBack, aml->GetSym(pGameHandle, "_Z27AtomicDefaultRenderCallBackP8RpAtomic"));
+    SET_TO(OnMainMenuExit,              aml->GetSym(pGameHandle, "_ZN14MainMenuScreen6OnExitEv"));
 
     SET_TO(gxtErrorString,              aml->GetSym(pGameHandle, "GxtErrorString"));
     SET_TO(gMobileMenu,                 aml->GetSym(pGameHandle, "gMobileMenu"));
@@ -721,6 +724,9 @@ void SAUtils::InitializeSAUtils()
     SET_TO(orgWidgetsPtr,               aml->GetSym(pGameHandle, "_ZN15CTouchInterface10m_pWidgetsE"));
     SET_TO(WorldPlayers,                *(void**)(pGameLib + 0x6783C8));
     
+    // Remove an "EXIT" button from MainMenu (to set it manually)
+    aml->PlaceB(pGameLib + 0x29BEBE + 0x1, pGameLib + 0x29BF48 + 0x1);
+
     // Scripting
     InitializeSAScripting();
 }

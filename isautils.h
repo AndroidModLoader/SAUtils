@@ -2,7 +2,24 @@
 #define _SAUTILS_INTERFACE
 
 #include <stdint.h>
-#include "sa_scripting.h"
+//#include "sa_scripting.h"
+
+/* Helper-defines */
+#define _VA_ARGS(...) , ##__VA_ARGS__
+#define MAX_SCRIPT_VARS 16
+#define MAX_SCRIPT_SIZE	255
+// Use those for easier CLEO opcodes calling and defining!
+#define DEFOPCODE(__opcode, __name, __args) const SCRIPT_COMMAND scm_##__name = { 0x##__opcode, #__args }
+#define CALLSCM(__name, ...)             sautils->ScriptCommand(&scm_##__name _VA_ARGS(__VA_ARGS__))
+
+/* Structures */
+struct SCRIPT_COMMAND
+{
+    uint16_t  opCode;
+    char      params[MAX_SCRIPT_VARS];
+};
+// Example:
+DEFOPCODE(FFFF, CRASH_GAME, ); // CALLSCM(CRASH_GAME); calls an unknown opcode FFFF and it crashes the game
 
 /* Just a class declarations */
 class CWidgetButton;
