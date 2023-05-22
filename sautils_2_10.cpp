@@ -33,13 +33,25 @@ extern DECL_HOOKv(RenderVehicle, void* self);
 extern DECL_HOOKv(RenderObject, void* self);
 extern DECL_HOOKv(MainMenuAddItems, FlowScreen* self);
 extern DECL_HOOKv(StartGameAddItems, FlowScreen* self);
+extern int AddImageToListPatched(const char* imgName, bool registerIt);
 
+extern CStreamingFile pNewStreamingFiles[MAX_IMG_ARCHIVES + 2];
 extern MobileSettings::Setting pNewSettings[MAX_SETTINGS];
 extern CWidget* pNewWidgets[MAX_WIDGETS];
 extern CPlayerInfo *WorldPlayers;
 
 void SAUtils_2_10::InitializeSAUtils()
 {
+    // Loaded IMG archives limit
+    aml->Unprot(pGameLib + 0x676AB8, sizeof(void*));
+    *(uintptr_t*)(pGameLib + 0x676AB8) = (uintptr_t)pNewStreamingFiles;
+    aml->Unprot(pGameLib + 0x46BDE8, sizeof(char));
+    *(unsigned char*)(pGameLib + 0x46BDE8) = (unsigned char)MAX_IMG_ARCHIVES+2;
+    aml->Unprot(pGameLib + 0x46BDF8, sizeof(char)); 
+    *(unsigned char*)(pGameLib + 0x46BDF8) = (unsigned char)MAX_IMG_ARCHIVES+2;
+    aml->Redirect(aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"), (uintptr_t)AddImageToListPatched);
+    logger->Info("IMG limit has been bumped!");
+
     // Bump settings limit
     aml->Unprot(pGameLib + 0x679A3C, sizeof(void*));
     *(uintptr_t*)(pGameLib + 0x679A3C) = (uintptr_t)pNewSettings;

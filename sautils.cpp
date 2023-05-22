@@ -108,18 +108,19 @@ void (*OnRestoreDefaultsAudioFn)(SelectScreen*, int);
 unsigned int* m_snTimeInMilliseconds;
 float* game_FPS;
 CWidget** orgWidgetsPtr;
+uintptr_t _ZTVN12SelectScreen15ActionSelectionE, _ZTVN12SelectScreen16SettingSelectionE, _ZTV13DisplayScreen;
 
 /* SAUtils */
-void AddRestoreDefaultsItem(SelectScreen* screen, bool isAudio = false)
+static void AddRestoreDefaultsItem(SelectScreen* screen, bool isAudio = false)
 {
     SelectScreen::ActionSelection* mob_rtd = new SelectScreen::ActionSelection;
-    mob_rtd->vtable = pGameLib + 0x66281C;
+    mob_rtd->vtable = _ZTVN12SelectScreen15ActionSelectionE;
     mob_rtd->tag = "MOB_RTD";
     mob_rtd->OnSelect = isAudio ? OnRestoreDefaultsAudioFn : OnRestoreDefaultsFn;
     mob_rtd->data = 0;
     AddSettingsItemFn(screen, mob_rtd);
 }
-void AddSettingsToScreen(SelectScreen* screen)
+static void AddSettingsToScreen(SelectScreen* screen)
 {
     int size = gMoreSettings.size();
     for(int i = 0; i < size; ++i)
@@ -130,7 +131,7 @@ void AddSettingsToScreen(SelectScreen* screen)
             if(setting->byteItemType == ItemType_Button)
             {
                 SelectScreen::ActionSelection* mob_rtd = new SelectScreen::ActionSelection;
-                mob_rtd->vtable = pGameLib + 0x66281C;
+                mob_rtd->vtable = _ZTVN12SelectScreen15ActionSelectionE;
                 mob_rtd->tag = setting->szName;
                 mob_rtd->OnSelect = setting->fnOnButtonPressed == NULL ? (void(*)(SelectScreen*,int))None : (void(*)(SelectScreen*,int))setting->fnOnButtonPressed;
                 mob_rtd->data = 0;
@@ -139,7 +140,7 @@ void AddSettingsToScreen(SelectScreen* screen)
             else
             {
                 SelectScreen::SettingSelection* menuItem = new SelectScreen::SettingSelection;
-                menuItem->vtable = pGameLib + 0x662848;
+                menuItem->vtable = _ZTVN12SelectScreen16SettingSelectionE;
                 menuItem->tag = setting->szName;
                 menuItem->forSetting = (MobileSetting)setting->nSettingId;
                 menuItem->curMoveReq = 0.0f;
@@ -241,10 +242,10 @@ MobileMenu* OnModSettingsOpened()
     snprintf(szSautilsVer, sizeof(szSautilsVer), "SAUtils v%s", modinfo->VersionString());
     CharSelectScreen* menuScreenPointer = new CharSelectScreen;
     InitializeMenuPtr(menuScreenPointer, "Mods Settings", true);
-    menuScreenPointer->vtable = pGameLib + 0x6628D0; // Vtable
+    menuScreenPointer->vtable = _ZTV13DisplayScreen; // Vtable
 
     SelectScreen::ActionSelection* sautilsVer = new SelectScreen::ActionSelection;
-    sautilsVer->vtable = pGameLib + 0x66281C;
+    sautilsVer->vtable = _ZTVN12SelectScreen15ActionSelectionE;
     sautilsVer->tag = szSautilsVer;
     sautilsVer->OnSelect = (void(*)(SelectScreen*,int))None;
     sautilsVer->data = 0;
@@ -277,7 +278,7 @@ MobileMenu* OnCustomModSettingsOpened()
     nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton - 6);
     CharSelectScreen* menuScreenPointer = new CharSelectScreen;
     InitializeMenuPtr(menuScreenPointer, gMoreSettingButtons[STB_Settings][nCurrentItemTab]->szName, true);
-    menuScreenPointer->vtable = pGameLib + 0x6628D0; // Vtable
+    menuScreenPointer->vtable = _ZTV13DisplayScreen; // Vtable
 
     AddSettingsToScreen(menuScreenPointer); // Custom items
 
@@ -657,7 +658,13 @@ void SAUtils::InitializeFunctions()
     SET_TO(m_snTimeInMilliseconds,      aml->GetSym(pGameHandle, "_ZN6CTimer22m_snTimeInMillisecondsE"));
     SET_TO(game_FPS,                    aml->GetSym(pGameHandle, "_ZN6CTimer8game_FPSE"));
     SET_TO(orgWidgetsPtr,               aml->GetSym(pGameHandle, "_ZN15CTouchInterface10m_pWidgetsE"));
-    SET_TO(WorldPlayers,                *(void**)(pGameLib + 0x6783C8));
+    
+    SET_TO(_ZTVN12SelectScreen15ActionSelectionE, aml->GetSym(pGameHandle, "_ZTVN12SelectScreen15ActionSelectionE"));
+    _ZTVN12SelectScreen15ActionSelectionE += 8;
+    SET_TO(_ZTVN12SelectScreen16SettingSelectionE, aml->GetSym(pGameHandle, "_ZTVN12SelectScreen16SettingSelectionE"));
+    _ZTVN12SelectScreen16SettingSelectionE += 8;
+    SET_TO(_ZTV13DisplayScreen, aml->GetSym(pGameHandle, "_ZTV13DisplayScreen"));
+    _ZTV13DisplayScreen += 8;
 }
 
 void SAUtils::InitializeSAUtils()
@@ -728,6 +735,7 @@ void SAUtils::InitializeSAUtils()
     //aml->Write(pGameLib + 0x29967C,     (uintptr_t)"\x0F\xA9", 2);
 
     InitializeFunctions();
+    SET_TO(WorldPlayers,                *(void**)(pGameLib + 0x6783C8));
     
     // Remove an "EXIT" button from MainMenu (to set it manually)
     aml->PlaceB(pGameLib + 0x29BEBE + 0x1, pGameLib + 0x29BF48 + 0x1);
