@@ -461,7 +461,7 @@ public:
      *  \param data An own data (def: null)
      *  \return Setting ID
      */
-    virtual int AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, const char** switchesArray = NULL, OnSettingChangedFn fnOnValueChange = NULL, void* data = NULL) = 0;
+    virtual int AddClickableItem(eTypeOfSettings typeOf, const char* name, int initVal, int minVal, int maxVal, const char** switchesArray, OnSettingChangedFn fnOnValueChange, void* data) = 0;
 
     /** Adds a slider in menu settings + data
      *
@@ -475,7 +475,7 @@ public:
      *  \param data An own data (def: null)
      *  \return Setting ID
      */
-    virtual int AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal = 0, int minVal = 0, int maxVal = 0, OnSettingChangedFn fnOnValueChange = NULL, OnSettingDrawedFn fnOnValueDraw = NULL, void* data = NULL) = 0;
+    virtual int AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal, int minVal, int maxVal, OnSettingChangedFn fnOnValueChange, OnSettingDrawedFn fnOnValueDraw, void* data) = 0;
 
     /** Calls a script opcode (mini-cleo)
      *
