@@ -49,6 +49,6 @@ extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering
     }
     
     ((SAUtils*)sautils)->m_pHasFLA = aml->GetLib("libplugin_fastman92limitAdjuster_ANDROID_ARM32.so");
-    if(!(SAUtils*)sautils)->m_pHasFLA) ((SAUtils*)sautils)->m_pHasFLA = aml->GetLib("libplugin_fastman92limitAdjuster_ANDROID_ARM64.so");
+    if(((SAUtils*)sautils)->m_pHasFLA == 0) ((SAUtils*)sautils)->m_pHasFLA = aml->GetLib("libplugin_fastman92limitAdjuster_ANDROID_ARM64.so");
     RegisterInterface("SAUtils", sautils);
 }
