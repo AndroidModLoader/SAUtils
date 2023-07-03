@@ -1,6 +1,7 @@
 #ifndef _SAUTILS_INTERFACE
 #define _SAUTILS_INTERFACE
 
+#include <mod/amlmod.h>
 #include <stdint.h>
 //#include "sa_scripting.h"
 
@@ -367,7 +368,11 @@ public:
      *  \param widget A pointer of the widget
      *  \return True if enabled
      */
-    inline bool IsWidgetEnabled(CWidgetButton* widget) { return *(bool*)((int)widget + 77); };
+    #ifdef AML32
+        inline bool IsWidgetEnabled(CWidgetButton* widget) { return *(bool*)((uintptr_t)widget + 77); };
+    #else
+        inline bool IsWidgetEnabled(CWidgetButton* widget) { return *(bool*)((uintptr_t)widget + 92); };
+    #endif
 
     /** Clear widget's tap history
      *

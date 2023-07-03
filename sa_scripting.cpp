@@ -25,7 +25,7 @@ inline uint8_t ExecuteScriptBuf()
     return gst->condResult;
 }
 
-int ScriptSACommand(const SCRIPT_COMMAND *pScriptCommand, va_list ap)
+int ScriptSACommandInner(const SCRIPT_COMMAND *pScriptCommand, va_list ap)
 {
     const char* p = pScriptCommand->params;
     memcpy(&ScriptBuf, &pScriptCommand->opCode, 2);
@@ -112,7 +112,7 @@ int ScriptSACommand(const SCRIPT_COMMAND *pScriptCommand, ...)
 {
     va_list ap;
     va_start(ap, pScriptCommand);
-    int ret = ScriptSACommand(pScriptCommand, ap);
+    int ret = ScriptSACommandInner(pScriptCommand, ap);
     va_end(ap);
     return ret;
 }

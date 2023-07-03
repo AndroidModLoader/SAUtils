@@ -6,7 +6,7 @@
 #include <vector>
 #include <cstring> // memcpy, memcmp
 
-#include "GTASA_STRUCTS.h"
+#include "GTASA_STRUCTS_210.h"
 
 MYMODDECL();
 extern uintptr_t pGameLib;
@@ -1192,12 +1192,12 @@ void SAUtils::AddTextureLookupListener(LookingForTextureFn fn)
     gTextureLookupFns.push_back(fn);
 }
 
-int ScriptSACommandInner(const SCRIPT_COMMAND *pScriptCommand, va_list ap);
+int ScriptSACommand(const SCRIPT_COMMAND *pScriptCommand, va_list ap);
 int SAUtils::ScriptCommand(const SCRIPT_COMMAND *pScriptCommand, ...)
 {
     va_list ap;
     va_start(ap, pScriptCommand);
-    int ret = ScriptSACommandInner(pScriptCommand, ap);
+    int ret = ScriptSACommand(pScriptCommand, ap);
     va_end(ap);
     return ret;
 }

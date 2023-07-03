@@ -2,6 +2,7 @@
 #define __SCRIPTING_H
 
 #include "isautils.h"
+#include "mod/amlmod.h"
 
 // This is the fastest way to use Game Logic ¯\_(ツ)_/¯
 // P.S. Taken from my ReSAMP project
@@ -9,6 +10,7 @@
 
 #include <stdint.h>
 
+#ifdef AML32
 struct GAME_SCRIPT_THREAD
 {
     uint8_t   pad1[20];
@@ -23,6 +25,19 @@ struct GAME_SCRIPT_THREAD
     uint8_t   notFlag;
     uint8_t   pad5[13];
 };
+#else
+struct GAME_SCRIPT_THREAD
+{
+    uint8_t   pad1[32];
+    uintptr_t dwScriptIP;
+    uint8_t   pad2[68];
+    uint32_t  dwLocalVar[32];
+    uint32_t  dwTimers[2];
+    uint8_t   pad3[33];
+    uint8_t   condResult;
+    uint8_t   pad4[26];
+};
+#endif
 
 
 // https://library.sannybuilder.com/#/sa_mobile
