@@ -15,7 +15,11 @@ void* pGameHandle = NULL;
 
 extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering
 {
-    logger->SetTag("SAUtils");
+    #ifdef AML32
+        logger->SetTag("SAUtils");
+    #else
+        logger->SetTag("SAUtils64");
+    #endif
     pGameLib = aml->GetLib("libGTASA.so");
     pGameHandle = aml->GetLibHandle("libGTASA.so");
     if(pGameLib && pGameHandle)

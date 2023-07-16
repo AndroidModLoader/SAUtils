@@ -55,7 +55,7 @@ void SAUtils_2_10::InitializeSAUtils()
     // Bump settings limit
     aml->Unprot(pGameLib + 0x679A3C, sizeof(void*));
     *(uintptr_t*)(pGameLib + 0x679A3C) = (uintptr_t)pNewSettings;
-    memcpy(pNewSettings, (int*)(pGameLib + 0x6E03FC), 1184);
+    memcpy(pNewSettings, (int*)(pGameLib + 0x6E03FC), 37 * sizeof(MobileSettings::Setting));
 
     // Bump widgets limit
     aml->Unprot(pGameLib + 0x679474, sizeof(void*)); *(uintptr_t*)(pGameLib + 0x679474)     = (uintptr_t)pNewWidgets;
