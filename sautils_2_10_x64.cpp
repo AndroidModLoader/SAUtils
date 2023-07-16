@@ -6,6 +6,7 @@
 #include <vector>
 #include <cstring> // memcpy, memcmp
 
+#include "ARMv8_ASMHelper.h"
 #include "GTASA_STRUCTS_210.h"
 
 MYMODDECL();
@@ -656,26 +657,6 @@ void SAUtils::InitializeFunctions()
     _ZTV13DisplayScreen += 2*sizeof(void*);
 }
 
-union CMPBits // Helper-structure
-{
-  struct
-  {
-      uint32_t pad1 : 10;
-      uint32_t imm : 12; // value is in range [0;4095]
-      uint32_t pad2 : 10;
-  };
-  uint32_t addr;
-};
-union MOVBits
-{
-  struct
-  {
-      uint32_t pad1 : 5;
-      uint32_t imm : 16;
-      uint32_t pad2 : 11;
-  };
-  uint32_t addr;
-};
 void SAUtils::InitializeSAUtils()
 {
     aml->Unprot(pGameLib + 0x84B5D0, sizeof(void*));
