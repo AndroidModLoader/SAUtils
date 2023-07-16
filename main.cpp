@@ -7,7 +7,7 @@
 #include <sautils_2_10.h>
 
 /* Same name but can be used for VC too! */
-MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.4.1, RusJJ)
+MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.5, RusJJ)
 
 uintptr_t pGameLib = 0;
 void* pGameHandle = NULL;
@@ -20,6 +20,7 @@ extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering
     pGameHandle = aml->GetLibHandle("libGTASA.so");
     if(pGameLib && pGameHandle)
     {
+        #ifdef AML32
         if(*(uint32_t*)(pGameLib + 0x202020) == 0xE8BDB001)
         {
             ((SAUtils*)sautils)->m_eLoadedGame = GTASA_2_00;
@@ -30,6 +31,10 @@ extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering
             ((SAUtils_2_10*)sautils)->m_eLoadedGame = GTASA_2_10;
             ((SAUtils_2_10*)sautils)->InitializeSAUtils();
         }
+        #else
+        ((SAUtils*)sautils)->m_eLoadedGame = GTASA_2_10;
+        ((SAUtils*)sautils)->InitializeSAUtils();
+        #endif
     }
     else
     {

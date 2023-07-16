@@ -240,9 +240,9 @@ MobileMenu* OnModSettingsOpened()
 {
     nCurrentItemTab = SetType_Mods;
     snprintf(szSautilsVer, sizeof(szSautilsVer), "SAUtils v%s", modinfo->VersionString());
-    CharSelectScreen* menuScreenPointer = new CharSelectScreen;
+    CharSelectScreen* menuScreenPointer = New<CharSelectScreen>();
     InitializeMenuPtr(menuScreenPointer, "Mods Settings", true);
-    menuScreenPointer->vtable = _ZTV13DisplayScreen; // Vtable
+    menuScreenPointer->vtable() = _ZTV13DisplayScreen; // Vtable
 
     SelectScreen::ActionSelection* sautilsVer = new SelectScreen::ActionSelection;
     sautilsVer->vtable = _ZTVN12SelectScreen15ActionSelectionE;
@@ -257,7 +257,7 @@ MobileMenu* OnModSettingsOpened()
     
     if(gMobileMenu->m_nScreensCount > 0)
     {
-        (*(void(**)(SelectScreen*, int))(menuScreenPointer->vtable + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
+        menuScreenPointer->SetPreviousScreen(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]);
     }
     if(gMobileMenu->m_pTopScreen != NULL) ProcessMenuPending(gMobileMenu);
     gMobileMenu->m_pTopScreen = menuScreenPointer;
@@ -276,16 +276,16 @@ MobileMenu* OnTabButtonClicked()
 MobileMenu* OnCustomModSettingsOpened()
 {
     nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton - 6);
-    CharSelectScreen* menuScreenPointer = new CharSelectScreen;
+    CharSelectScreen* menuScreenPointer = New<CharSelectScreen>();
     InitializeMenuPtr(menuScreenPointer, gMoreSettingButtons[STB_Settings][nCurrentItemTab]->szName, true);
-    menuScreenPointer->vtable = _ZTV13DisplayScreen; // Vtable
+    menuScreenPointer->vtable() = _ZTV13DisplayScreen; // Vtable
 
     AddSettingsToScreen(menuScreenPointer); // Custom items
 
     menuScreenPointer->renderLastAtBottom = false;
     if(gMobileMenu->m_nScreensCount)
     {
-        (*(void(**)(MenuScreen*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
+        menuScreenPointer->SetPreviousScreen(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]);
     }
     if(gMobileMenu->m_pTopScreen != NULL) ProcessMenuPending(gMobileMenu);
     gMobileMenu->m_pTopScreen = menuScreenPointer;
@@ -409,31 +409,31 @@ extern "C" void NewScreen_Audio_inject(SelectScreen* self)
 
 __attribute__((optnone)) __attribute__((naked)) void NewScreen_Controls_stub(void)
 {
-    asm("PUSH {R0}\nMOV R0, R8");
+    asm("STR X0, [SP, #-16]!\nMOV X0, X19");
     asm("BL NewScreen_Controls_inject");
-    asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Controls_backto));
-    asm("POP {R0}\nBX R12");
+    asm volatile("MOV X16, %0\n" :: "r"(NewScreen_Controls_backto));
+    asm("LDR X0, [SP], #16\nBR X16");
 }
 __attribute__((optnone)) __attribute__((naked)) void NewScreen_Game_stub(void)
 {
-    asm("PUSH {R0}\nMOV R0, R4");
+    asm("STR X0, [SP, #-16]!\nMOV X0, X19");
     asm("BL NewScreen_Game_inject");
-    asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Game_backto));
-    asm("POP {R0}\nBX R12");
+    asm volatile("MOV X16, %0\n" :: "r"(NewScreen_Game_backto));
+    asm("LDR X0, [SP], #16\nBR X16");
 }
 __attribute__((optnone)) __attribute__((naked)) void NewScreen_Display_stub(void)
 {
-    asm("PUSH {R0}\nMOV R0, R4");
+    asm("STR X0, [SP, #-16]!\nMOV X0, X19");
     asm("BL NewScreen_Display_inject");
-    asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Display_backto));
-    asm("POP {R0}\nBX R12");
+    asm volatile("MOV X16, %0\n" :: "r"(NewScreen_Display_backto));
+    asm("LDR X0, [SP], #16\nBR X16");
 }
 __attribute__((optnone)) __attribute__((naked)) void NewScreen_Audio_stub(void)
 {
-    asm("PUSH {R0}\nMOV R0, R4");
+    asm("STR X0, [SP, #-16]!\nMOV X0, X19");
     asm("BL NewScreen_Audio_inject");
-    asm volatile("MOV R12, %0\n" :: "r"(NewScreen_Audio_backto));
-    asm("POP {R0}\nBX R12");
+    asm volatile("MOV X16, %0\n" :: "r"(NewScreen_Audio_backto));
+    asm("LDR X0, [SP], #16\nBR X16");
 }
 
 DECL_HOOK(void*, NewScreen_Language, SelectScreen* self)
@@ -442,18 +442,6 @@ DECL_HOOK(void*, NewScreen_Language, SelectScreen* self)
     NewScreen_Language(self);
     AddSettingsToScreen(self);
     return self;
-}
-
-extern "C" void DrawSlider_inject(void* self)
-{
-    
-}
-__attribute__((optnone)) __attribute__((naked)) void DrawSlider_stub(void)
-{
-    asm("PUSH {R0}\nMOV R0, R4");
-    asm("BL DrawSlider_inject");
-    asm volatile("MOV R12, %0\n" :: "r"(DrawSlider_backto));
-    asm("POP {R0}\nBX R12");
 }
 
 int AddImageToListPatched(const char* imgName, bool registerIt)
@@ -660,60 +648,54 @@ void SAUtils::InitializeFunctions()
     SET_TO(orgWidgetsPtr,               aml->GetSym(pGameHandle, "_ZN15CTouchInterface10m_pWidgetsE"));
     
     SET_TO(_ZTVN12SelectScreen15ActionSelectionE, aml->GetSym(pGameHandle, "_ZTVN12SelectScreen15ActionSelectionE"));
-    _ZTVN12SelectScreen15ActionSelectionE += 8;
+    _ZTVN12SelectScreen15ActionSelectionE += 2*sizeof(void*);
     SET_TO(_ZTVN12SelectScreen16SettingSelectionE, aml->GetSym(pGameHandle, "_ZTVN12SelectScreen16SettingSelectionE"));
-    _ZTVN12SelectScreen16SettingSelectionE += 8;
+    _ZTVN12SelectScreen16SettingSelectionE += 2*sizeof(void*);
     SET_TO(_ZTV13DisplayScreen, aml->GetSym(pGameHandle, "_ZTV13DisplayScreen"));
-    _ZTV13DisplayScreen += 8;
+    _ZTV13DisplayScreen += 2*sizeof(void*);
 }
 
 void SAUtils::InitializeSAUtils()
 {
-    // Freak ya FLA and your sh*t
-    if(m_pHasFLA == 0 || !memcmp((void*)(aml->GetSym(pGameHandle, "_ZN10CStreaming13InitImageListEv") & ~0x1), (void*)"\xF0\xB5\x03\xAF\x4D\xF8", 6))
-    {
-        aml->Unprot(pGameLib + 0x676AC4, sizeof(void*));
-        *(uintptr_t*)(pGameLib + 0x676AC4) = (uintptr_t)pNewStreamingFiles;
-        aml->Unprot(pGameLib + 0x46BD78, sizeof(char));
-        *(unsigned char*)(pGameLib + 0x46BD78) = (unsigned char)MAX_IMG_ARCHIVES+2;
-        aml->Unprot(pGameLib + 0x46BFE4, sizeof(char)); 
-        *(unsigned char*)(pGameLib + 0x46BFE4) = (unsigned char)MAX_IMG_ARCHIVES+2;
-        aml->Redirect(aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"), (uintptr_t)AddImageToListPatched);
-
-        logger->Info("IMG limit has been bumped!");
-    }
+    aml->Unprot(pGameLib + 0x84B5D0, sizeof(void*));
+    *(uintptr_t*)(pGameLib + 0x84B5D0) = (uintptr_t)pNewStreamingFiles;
+    //aml->Unprot(pGameLib + 0x46BD78, sizeof(char));
+    //*(unsigned char*)(pGameLib + 0x46BD78) = (unsigned char)MAX_IMG_ARCHIVES+2;
+    //aml->Unprot(pGameLib + 0x46BFE4, sizeof(char));
+    //*(unsigned char*)(pGameLib + 0x46BFE4) = (unsigned char)MAX_IMG_ARCHIVES+2;
+    aml->Redirect(aml->GetSym(pGameHandle, "_ZN10CStreaming14AddImageToListEPKcb"), (uintptr_t)AddImageToListPatched);
 
     // Bump settings limit
-    aml->Unprot(pGameLib + 0x679A40, sizeof(void*));
-    *(uintptr_t*)(pGameLib + 0x679A40) = (uintptr_t)pNewSettings;
-    memcpy(pNewSettings, (int*)(pGameLib + 0x6E03F4), 1184);
+    aml->Unprot(pGameLib + 0x851498, sizeof(void*));
+    *(uintptr_t*)(pGameLib + 0x851498) = (uintptr_t)pNewSettings;
+    memcpy(pNewSettings, (void*)(pGameLib + 0x8BEB38), 1480);
 
     // Bump widgets limit
-    aml->Unprot(pGameLib + 0x67947C, sizeof(void*)); *(uintptr_t*)(pGameLib + 0x67947C)     = (uintptr_t)pNewWidgets;
-    aml->Unprot(pGameLib + 0x2AE58E, sizeof(char));  *(unsigned char*)(pGameLib + 0x2AE58E) = (unsigned char)MAX_WIDGETS; // Create all
-    aml->Unprot(pGameLib + 0x2AFBC0, sizeof(char));  *(unsigned char*)(pGameLib + 0x2AFBC0) = (unsigned char)MAX_WIDGETS; // Delete all
-    aml->Unprot(pGameLib + 0x2B0B32, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0B32) = (unsigned char)MAX_WIDGETS; // Update
-    aml->Unprot(pGameLib + 0x2B0B50, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0B50) = (unsigned char)MAX_WIDGETS; // Update
-    aml->Unprot(pGameLib + 0x2B0C8C, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0C8C) = (unsigned char)MAX_WIDGETS-1; // Visualize all
-    aml->Unprot(pGameLib + 0x2B05B2, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B05B2) = (unsigned char)MAX_WIDGETS-1; // Clear
-    aml->Unprot(pGameLib + 0x2B0644, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0644) = (unsigned char)MAX_WIDGETS-1; // Clear
-    aml->Unprot(pGameLib + 0x2B0748, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0748) = (unsigned char)MAX_WIDGETS-1; // Clear
-    aml->Unprot(pGameLib + 0x2B0986, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0986) = (unsigned char)MAX_WIDGETS-1; // Clear
-    aml->Unprot(pGameLib + 0x2B07D2, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B07D2) = (unsigned char)MAX_WIDGETS; // Clear
-    aml->Unprot(pGameLib + 0x2B087E, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B087E) = (unsigned char)MAX_WIDGETS; // Clear
-    aml->Unprot(pGameLib + 0x2B0C34, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0C34) = (unsigned char)MAX_WIDGETS; // Draw All
-    aml->Unprot(pGameLib + 0x2B28E8, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B28E8) = (unsigned char)MAX_WIDGETS-1; // AnyWidgetsUsingAltBack
-    HOOKPLT(CreateAllWidgets, pGameLib + 0x6734E4);
+    aml->Unprot(pGameLib + 0x850910, sizeof(void*)); *(uintptr_t*)(pGameLib + 0x850910)     = (uintptr_t)pNewWidgets;
+    //aml->Unprot(pGameLib + 0x2AE58E, sizeof(char));  *(unsigned char*)(pGameLib + 0x2AE58E) = (unsigned char)MAX_WIDGETS; // Create all
+    //aml->Unprot(pGameLib + 0x2AFBC0, sizeof(char));  *(unsigned char*)(pGameLib + 0x2AFBC0) = (unsigned char)MAX_WIDGETS; // Delete all
+    //aml->Unprot(pGameLib + 0x2B0B32, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0B32) = (unsigned char)MAX_WIDGETS; // Update
+    //aml->Unprot(pGameLib + 0x2B0B50, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0B50) = (unsigned char)MAX_WIDGETS; // Update
+    //aml->Unprot(pGameLib + 0x2B0C8C, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0C8C) = (unsigned char)MAX_WIDGETS-1; // Visualize all
+    //aml->Unprot(pGameLib + 0x2B05B2, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B05B2) = (unsigned char)MAX_WIDGETS-1; // Clear
+    //aml->Unprot(pGameLib + 0x2B0644, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0644) = (unsigned char)MAX_WIDGETS-1; // Clear
+    //aml->Unprot(pGameLib + 0x2B0748, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0748) = (unsigned char)MAX_WIDGETS-1; // Clear
+    //aml->Unprot(pGameLib + 0x2B0986, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0986) = (unsigned char)MAX_WIDGETS-1; // Clear
+    //aml->Unprot(pGameLib + 0x2B07D2, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B07D2) = (unsigned char)MAX_WIDGETS; // Clear
+    //aml->Unprot(pGameLib + 0x2B087E, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B087E) = (unsigned char)MAX_WIDGETS; // Clear
+    //aml->Unprot(pGameLib + 0x2B0C34, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B0C34) = (unsigned char)MAX_WIDGETS; // Draw All
+    //aml->Unprot(pGameLib + 0x2B28E8, sizeof(char));  *(unsigned char*)(pGameLib + 0x2B28E8) = (unsigned char)MAX_WIDGETS-1; // AnyWidgetsUsingAltBack
+    HOOKPLT(CreateAllWidgets, pGameLib + 0x8459D8);
 
     // Hook functions
-    HOOKPLT(AsciiToGxtChar,             pGameLib + 0x6724F8);
-    HOOKPLT(SelectScreenOnDestroy,      pGameLib + 0x673FD8);
-    HOOKPLT(SettingSelectionRender,     pGameLib + 0x662850);
-    HOOKPLT(GxtTextGet,                 pGameLib + 0x66E78C);
-    HOOKPLT(SettingsScreen_Construct,   pGameLib + 0x674018);
-    HOOKPLT(InitialiseRenderWare,       pGameLib + 0x66F2D0);
-    HOOKPLT(InitialiseGame_SecondPass,  pGameLib + 0x672178);
-    HOOKPLT(PlayerProcess,              pGameLib + 0x673E84);
+    HOOKPLT(AsciiToGxtChar,             pGameLib + 0x844008);
+    HOOKPLT(SelectScreenOnDestroy,      pGameLib + 0x846BC8);
+    HOOKPLT(SettingSelectionRender,     pGameLib + 0x825FA0);
+    HOOKPLT(GxtTextGet,                 pGameLib + 0x83DC48);
+    HOOKPLT(SettingsScreen_Construct,   pGameLib + 0x846C40);
+    HOOK(InitialiseRenderWare,          aml->GetSym(pGameHandle, "_ZN5CGame20InitialiseRenderWareEv"));
+    HOOKPLT(InitialiseGame_SecondPass,  pGameLib + 0x843A80);
+    HOOKPLT(PlayerProcess,              pGameLib + 0x846998);
     HOOK(RenderEffects,                 aml->GetSym(pGameHandle, "_Z13RenderEffectsv"));
     HOOK(RenderMenu,                    aml->GetSym(pGameHandle, "_ZN10MobileMenu6RenderEv"));
     HOOK(RenderPed,                     aml->GetSym(pGameHandle, "_ZN4CPed6RenderEv"));
@@ -724,47 +706,21 @@ void SAUtils::InitializeSAUtils()
     HOOK(StartGameAddItems,             aml->GetSym(pGameHandle, "_ZN14MainMenuScreen11OnStartGameEv"));
 
     // Hooked settings functions
-    aml->Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;
-    aml->Redirect(pGameLib + 0x2A49F6 + 0x1, (uintptr_t)NewScreen_Game_stub); NewScreen_Game_backto = pGameLib + 0x2A4A1E + 0x1;
-    aml->Redirect(pGameLib + 0x2A4BD4 + 0x1, (uintptr_t)NewScreen_Display_stub); NewScreen_Display_backto = pGameLib + 0x2A4BFC + 0x1;
-    aml->Redirect(pGameLib + 0x2A4D3C + 0x1, (uintptr_t)NewScreen_Audio_stub); NewScreen_Audio_backto = pGameLib + 0x2A4D64 + 0x1;
-    HOOKPLT(NewScreen_Language,         pGameLib + 0x675D90);
-
-    // Slider drawing hook
-    //Redirect(pGameLib + 0x299660 + 0x1, (uintptr_t)DrawSlider_stub); DrawSlider_backto = pGameLib + 0x29967C + 0x1;
-    //aml->Write(pGameLib + 0x29967C,     (uintptr_t)"\x0F\xA9", 2);
+    aml->Redirect(pGameLib + 0x35B0CC, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x35B10C;
+    aml->Redirect(pGameLib + 0x3634A8, (uintptr_t)NewScreen_Game_stub); NewScreen_Game_backto = pGameLib + 0x3634E8;
+    aml->Redirect(pGameLib + 0x3636F0, (uintptr_t)NewScreen_Display_stub); NewScreen_Display_backto = pGameLib + 0x363730;
+    aml->Redirect(pGameLib + 0x3638C0, (uintptr_t)NewScreen_Audio_stub); NewScreen_Audio_backto = pGameLib + 0x363900;
+    HOOKPLT(NewScreen_Language,         pGameLib + 0x849C00);
 
     InitializeFunctions();
-    SET_TO(WorldPlayers,                *(void**)(pGameLib + 0x6783C8));
+    SET_TO(WorldPlayers,                *(void**)(pGameLib + 0x84E7A8));
     
     // Remove an "EXIT" button from MainMenu (to set it manually)
-    aml->PlaceB(pGameLib + 0x29BEBE + 0x1, pGameLib + 0x29BF48 + 0x1);
+    aml->PlaceNOP(pGameLib + 0x3586E8, 1); // ++*p_numEntries
 
     // Scripting
     InitializeSAScripting();
 }
-void SAUtils::InitializeVCUtils()
-{
-    gxtErrorString = (unsigned short*)(pGameLib + 0x716C2C);
-
-    //aml->Unprot(pGameLib + 0x679A40, sizeof(void*));
-    //*(uintptr_t*)(pGameLib + 0x679A40) = (uintptr_t)pNewSettings;
-    //memcpy(pNewSettings, (int*)(pGameLib + 0x6E03F4), 1184);
-
-    HOOK(GxtTextGet, aml->GetSym(pGameHandle, "_ZN5CText3GetEPKc"));
-    HOOK(AsciiToGxtChar, aml->GetSym(pGameHandle, "_Z14AsciiToUnicodePKcPt"));
-    //HOOKPLT(NewScreen_Controls, pGameLib + 0x675CD8);
-    //HOOKPLT(NewScreen_Game, pGameLib + 0x674310);
-    //HOOKPLT(NewScreen_Display, pGameLib + 0x675150);
-    //HOOKPLT(NewScreen_Audio, pGameLib + 0x66FBA4);
-    //HOOKPLT(NewScreen_Language, pGameLib + 0x675D90);
-    //HOOKPLT(SelectScreenAddItem, pGameLib + 0x674518);
-    HOOK(SelectScreenOnDestroy, aml->GetSym(pGameHandle, "_ZN12CMenuManager4BackEv"));
-
-    //fnSettingsAddItem = (SettingsAddItemFn)(pGameLib + 0x19C840);
-}
-
-
 
 /* Interface */
 /* Interface */
@@ -993,7 +949,7 @@ CWidgetButton* SAUtils::CreateWidget(int widgetId, int x, int y, float scale, co
        widgetId < WIDGETID_MAX ||
        pNewWidgets[widgetId] != NULL) return NULL;
 
-    CWidgetButton* widget = new CWidgetButton;
+    CWidgetButton* widget = New<CWidgetButton>();
     WidgetButton_Constructor(widget, textureName, WidgetPosition(x, y, scale), 1, 0, HID_MAPPING_UNKNOWN);
     pNewWidgets[widgetId] = widget;
 
@@ -1009,46 +965,40 @@ int SAUtils::GetWidgetIndex(CWidgetButton* widget)
 
 void SAUtils::SetWidgetIcon(CWidgetButton* widget, uintptr_t texturePtr)
 {
-    if(widget->widgetSprite != NULL)
-    {
-        RwTextureDestroy(widget->widgetSprite->m_pTexture);
-        widget->widgetSprite->m_pTexture = NULL;
-    }
+    RwTextureDestroy(widget->widgetSprite.m_pTexture);
+    widget->widgetSprite.m_pTexture = NULL;
 
     if(texturePtr != 0)
     {
         RwTexture* org = (RwTexture*)texturePtr;
         RwTexture* tex = CopyRWTexture(org);
         tex->filterAddressing = org->filterAddressing;
-        widget->widgetSprite->m_pTexture = tex;
+        widget->widgetSprite.m_pTexture = tex;
     }
 }
 
 void SAUtils::SetWidgetIcon(CWidgetButton* widget, const char* textureName)
 {
-    SetSpriteTexture(widget->widgetSprite, textureName);
+    SetSpriteTexture(&widget->widgetSprite, textureName);
 }
 
 void SAUtils::SetWidgetIcon2(CWidgetButton* widget, uintptr_t texturePtr)
 {
-    if(widget->additionalSprite != NULL)
-    {
-        RwTextureDestroy(widget->additionalSprite->m_pTexture);
-        widget->additionalSprite->m_pTexture = NULL;
-    }
+    RwTextureDestroy(widget->additionalSprite.m_pTexture);
+    widget->additionalSprite.m_pTexture = NULL;
 
     if(texturePtr != 0)
     {
         RwTexture* org = (RwTexture*)texturePtr;
         RwTexture* tex = CopyRWTexture(org);
         tex->filterAddressing = org->filterAddressing;
-        widget->additionalSprite->m_pTexture = tex;
+        widget->additionalSprite.m_pTexture = tex;
     }
 }
 
 void SAUtils::SetWidgetIcon2(CWidgetButton* widget, const char* textureName)
 {
-    SetSpriteTexture(widget->additionalSprite, textureName);
+    SetSpriteTexture(&widget->additionalSprite, textureName);
 }
 
 void SAUtils::ToggleWidget(CWidgetButton* widget, bool enable)
@@ -1192,12 +1142,12 @@ void SAUtils::AddTextureLookupListener(LookingForTextureFn fn)
     gTextureLookupFns.push_back(fn);
 }
 
-int ScriptSACommand(const SCRIPT_COMMAND *pScriptCommand, va_list ap);
+int ScriptSACommandInner(const SCRIPT_COMMAND *pScriptCommand, va_list ap);
 int SAUtils::ScriptCommand(const SCRIPT_COMMAND *pScriptCommand, ...)
 {
     va_list ap;
     va_start(ap, pScriptCommand);
-    int ret = ScriptSACommand(pScriptCommand, ap);
+    int ret = ScriptSACommandInner(pScriptCommand, ap);
     va_end(ap);
     return ret;
 }

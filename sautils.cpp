@@ -240,9 +240,9 @@ MobileMenu* OnModSettingsOpened()
 {
     nCurrentItemTab = SetType_Mods;
     snprintf(szSautilsVer, sizeof(szSautilsVer), "SAUtils v%s", modinfo->VersionString());
-    CharSelectScreen* menuScreenPointer = new CharSelectScreen;
+    CharSelectScreen* menuScreenPointer = New<CharSelectScreen>();
     InitializeMenuPtr(menuScreenPointer, "Mods Settings", true);
-    menuScreenPointer->vtable = _ZTV13DisplayScreen; // Vtable
+    menuScreenPointer->vtable() = _ZTV13DisplayScreen; // Vtable
 
     SelectScreen::ActionSelection* sautilsVer = new SelectScreen::ActionSelection;
     sautilsVer->vtable = _ZTVN12SelectScreen15ActionSelectionE;
@@ -257,7 +257,7 @@ MobileMenu* OnModSettingsOpened()
     
     if(gMobileMenu->m_nScreensCount > 0)
     {
-        (*(void(**)(SelectScreen*, int))(menuScreenPointer->vtable + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
+        (*(void(**)(SelectScreen*, int))(menuScreenPointer->vtable() + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
     }
     if(gMobileMenu->m_pTopScreen != NULL) ProcessMenuPending(gMobileMenu);
     gMobileMenu->m_pTopScreen = menuScreenPointer;
@@ -276,9 +276,9 @@ MobileMenu* OnTabButtonClicked()
 MobileMenu* OnCustomModSettingsOpened()
 {
     nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton - 6);
-    CharSelectScreen* menuScreenPointer = new CharSelectScreen;
+    CharSelectScreen* menuScreenPointer = New<CharSelectScreen>();
     InitializeMenuPtr(menuScreenPointer, gMoreSettingButtons[STB_Settings][nCurrentItemTab]->szName, true);
-    menuScreenPointer->vtable = _ZTV13DisplayScreen; // Vtable
+    menuScreenPointer->vtable() = _ZTV13DisplayScreen; // Vtable
 
     AddSettingsToScreen(menuScreenPointer); // Custom items
 
@@ -660,11 +660,11 @@ void SAUtils::InitializeFunctions()
     SET_TO(orgWidgetsPtr,               aml->GetSym(pGameHandle, "_ZN15CTouchInterface10m_pWidgetsE"));
     
     SET_TO(_ZTVN12SelectScreen15ActionSelectionE, aml->GetSym(pGameHandle, "_ZTVN12SelectScreen15ActionSelectionE"));
-    _ZTVN12SelectScreen15ActionSelectionE += 8;
+    _ZTVN12SelectScreen15ActionSelectionE += 2*sizeof(void*);
     SET_TO(_ZTVN12SelectScreen16SettingSelectionE, aml->GetSym(pGameHandle, "_ZTVN12SelectScreen16SettingSelectionE"));
-    _ZTVN12SelectScreen16SettingSelectionE += 8;
+    _ZTVN12SelectScreen16SettingSelectionE += 2*sizeof(void*);
     SET_TO(_ZTV13DisplayScreen, aml->GetSym(pGameHandle, "_ZTV13DisplayScreen"));
-    _ZTV13DisplayScreen += 8;
+    _ZTV13DisplayScreen += 2*sizeof(void*);
 }
 
 void SAUtils::InitializeSAUtils()
@@ -993,7 +993,7 @@ CWidgetButton* SAUtils::CreateWidget(int widgetId, int x, int y, float scale, co
        widgetId < WIDGETID_MAX ||
        pNewWidgets[widgetId] != NULL) return NULL;
 
-    CWidgetButton* widget = new CWidgetButton;
+    CWidgetButton* widget = New<CWidgetButton>();
     WidgetButton_Constructor(widget, textureName, WidgetPosition(x, y, scale), 1, 0, HID_MAPPING_UNKNOWN);
     pNewWidgets[widgetId] = widget;
 
