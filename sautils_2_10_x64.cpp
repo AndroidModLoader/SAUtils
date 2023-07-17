@@ -693,16 +693,16 @@ void SAUtils::InitializeSAUtils()
     HOOKPLT(SettingSelectionRender,     pGameLib + 0x825FA0);
     HOOKPLT(GxtTextGet,                 pGameLib + 0x83DC48);
     HOOKPLT(SettingsScreen_Construct,   pGameLib + 0x846C40);
-    HOOK(InitialiseRenderWare,          aml->GetSym(pGameHandle, "_ZN5CGame20InitialiseRenderWareEv"));
+    HOOKPLT(InitialiseRenderWare,       pGameLib + 0x8432F0);
     HOOKPLT(InitialiseGame_SecondPass,  pGameLib + 0x843A80);
     HOOKPLT(PlayerProcess,              pGameLib + 0x846998);
     HOOK(RenderEffects,                 aml->GetSym(pGameHandle, "_Z13RenderEffectsv"));
-    HOOK(RenderMenu,                    aml->GetSym(pGameHandle, "_ZN10MobileMenu6RenderEv"));
+    HOOKPLT(RenderMenu,                 pGameLib + 0x846FE8);
     HOOK(RenderPed,                     aml->GetSym(pGameHandle, "_ZN4CPed6RenderEv"));
     HOOK(RenderVehicle,                 aml->GetSym(pGameHandle, "_ZN8CVehicle6RenderEv"));
     HOOK(RenderObject,                  aml->GetSym(pGameHandle, "_ZN7CObject6RenderEv"));
-    HOOK(GetTextureFromDB_HOOKED,       aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
-    HOOK(MainMenuAddItems,              aml->GetSym(pGameHandle, "_ZN14MainMenuScreen11AddAllItemsEv"));
+    HOOKPLT(GetTextureFromDB_HOOKED,    pGameLib + 0x8477C8);
+    HOOKPLT(MainMenuAddItems,           pGameLib + 0x845E50);
     HOOKPLT(StartGameAddItems_PLT,      pGameLib + 0x8264B0); // vtable fn
 
     // Hooked settings functions
