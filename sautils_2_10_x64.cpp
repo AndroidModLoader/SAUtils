@@ -538,9 +538,9 @@ DECL_HOOKv(MainMenuAddItems, FlowScreen* self)
     AddSettingsButton(self, "FEP_QUI", "menu_mainquit", OnMainMenuExit); // Bring back "EXIT" button
     // Custom tabs!
 }
-DECL_HOOKv(StartGameAddItems_PLT, FlowScreen* self)
+DECL_HOOKv(StartGameAddItems, FlowScreen* self)
 {
-    StartGameAddItems_PLT(self);
+    StartGameAddItems(self);
 
     curScr = self;
     curLoc = STB_StartGame;
@@ -669,9 +669,7 @@ void SAUtils::InitializeSAUtils()
     memcpy(pNewSettings, (void*)(pGameLib + 0x8BEB38), 37 * sizeof(MobileSettings::Setting));
 
     // Bump widgets limit
-    logger->Info("pWidgets 1: 0x%X", *(uintptr_t*)(pGameLib + 0x850910));
     aml->Unprot(pGameLib + 0x850910, sizeof(void*));     *(uintptr_t*)(pGameLib + 0x850910)     = (uintptr_t)pNewWidgets;
-    logger->Info("pWidgets 2: 0x%X (should be 0x%X)", *(uintptr_t*)(pGameLib + 0x850910), pNewWidgets);
     aml->Unprot(pGameLib + 0x36D12C, sizeof(uint32_t));  ((CMPBits*)(pGameLib + 0x36D12C))->imm = (uint32_t)MAX_WIDGETS * sizeof(void*); // Create all
     aml->Unprot(pGameLib + 0x36ED78, sizeof(uint32_t));  ((CMPBits*)(pGameLib + 0x36ED78))->imm = (uint32_t)MAX_WIDGETS * sizeof(void*); // Delete all
     aml->Unprot(pGameLib + 0x36FABC, sizeof(uint32_t));  ((CMPBits*)(pGameLib + 0x36FABC))->imm = (uint32_t)MAX_WIDGETS * sizeof(void*); // Update
@@ -703,7 +701,7 @@ void SAUtils::InitializeSAUtils()
     HOOK(RenderObject,                  aml->GetSym(pGameHandle, "_ZN7CObject6RenderEv"));
     HOOKPLT(GetTextureFromDB_HOOKED,    pGameLib + 0x8477C8);
     HOOKPLT(MainMenuAddItems,           pGameLib + 0x845E50);
-    HOOKPLT(StartGameAddItems_PLT,      pGameLib + 0x8264B0); // vtable fn
+    HOOKPLT(StartGameAddItems,          pGameLib + 0x8264B0); // vtable fn
 
     // Hooked settings functions
     aml->Redirect(pGameLib + 0x35B0CC, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x35B10C;
