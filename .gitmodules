@@ -1,0 +1,3 @@
+[submodule "AArch64_ModHelper"]
+	path = AArch64_ModHelper
+	url = https://github.com/RusJJ/AArch64_ModHelper

@@ -6,7 +6,7 @@
 #include <vector>
 #include <cstring> // memcpy, memcmp
 
-#include "ARMv8_ASMHelper.h"
+#include "AArch64_ModHelper/ARMv8_ASMHelper.h"
 #include "GTASA_STRUCTS_210.h"
 
 MYMODDECL();
