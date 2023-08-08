@@ -105,6 +105,7 @@ public:
     // 1.5.1
     int             GetPoolSize(ePoolType poolType);
     int             GetPoolMemSize(ePoolType poolType);
+    int             GetPoolIndex(void* entityPtr);
 
 public:
     eLoadedGame     m_eLoadedGame;

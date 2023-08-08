@@ -1308,5 +1308,19 @@ int SAUtils::GetPoolMemSize(ePoolType poolType)
     }
 }
 
+int SAUtils::GetPoolIndex(void* entityPtr)
+{
+    if(!entityPtr) return -1;
+    CEntity* ent = (CEntity*)entityPtr;
+    switch(ent->m_nType)
+    {
+        default: return -1;
+
+        case ENTITY_TYPE_PED:     return ((*ms_pPedPool)->IsFromObjectArray((CPed*)ent)) ? (*ms_pPedPool)->GetIndex((CPed*)ent) : -1;
+        case ENTITY_TYPE_OBJECT:  return ((*ms_pObjectPool)->IsFromObjectArray((CObject*)ent)) ? (*ms_pObjectPool)->GetIndex((CObject*)ent) : -1;
+        case ENTITY_TYPE_VEHICLE: return ((*ms_pVehiclePool)->IsFromObjectArray((CVehicle*)ent)) ? (*ms_pVehiclePool)->GetIndex((CVehicle*)ent) : -1;
+    }
+}
+
 static SAUtils sautilsLocal;
 ISAUtils* sautils = &sautilsLocal;

@@ -556,6 +556,13 @@ public:
      *  \return An allocated memory size of Object pool (returns 0 if there is any error)
      */
     virtual int GetPoolMemSize(ePoolType poolType) = 0;
+
+    /** Returns a pool index of a given entity (only pools from ePoolType are supported!)
+     *
+     *  \param entityPtr A pointer of an entity
+     *  \return An index of a value (value less than 0 if error occured)
+     */
+    virtual int GetPoolIndex(void* entityPtr) = 0;
 };
 
 #endif // _SAUTILS_INTERFACE
