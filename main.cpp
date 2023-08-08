@@ -7,11 +7,10 @@
 #include <sautils_2_10.h>
 
 /* Same name but can be used for VC too! */
-MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.5, RusJJ)
+MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.5.1, RusJJ)
 
 uintptr_t pGameLib = 0;
 void* pGameHandle = NULL;
-
 
 extern "C" void OnModPreLoad() // PreLoad is a place for interfaces registering
 {

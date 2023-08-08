@@ -8,6 +8,7 @@
 
 #include "AArch64_ModHelper/ARMv8_ASMHelper.h"
 #include "GTASA_STRUCTS_210.h"
+using namespace ARMv8;
 
 MYMODDECL();
 extern uintptr_t pGameLib;
@@ -41,6 +42,11 @@ bool            g_bIsGameStartedAlready = false;
 MobileSettings::Setting                pNewSettings[MAX_SETTINGS] {0}; // A new char MobileSettings::settings[37*8*4]
 CWidget*                               pNewWidgets[MAX_WIDGETS] {NULL};
 CStreamingFile                         pNewStreamingFiles[MAX_IMG_ARCHIVES + 2] {0}; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
+
+/* Vars */
+CPool<CPed, CCopPed> **ms_pPedPool;
+CPool<CVehicle, CPlane> **ms_pVehiclePool;
+CPool<CObject, CCutsceneObject> **ms_pObjectPool;
 
 /* Funcs */
 typedef void* (*SettingsAddItemFn)(SelectScreen* a1, SelectScreen::MenuSelection* a2);
@@ -655,6 +661,11 @@ void SAUtils::InitializeFunctions()
     _ZTVN12SelectScreen16SettingSelectionE += 2*sizeof(void*);
     SET_TO(_ZTV13DisplayScreen, aml->GetSym(pGameHandle, "_ZTV13DisplayScreen"));
     _ZTV13DisplayScreen += 2*sizeof(void*);
+
+    // And also variables
+    SET_TO(ms_pPedPool,                 aml->GetSym(pGameHandle, "_ZN6CPools11ms_pPedPoolE"));
+    SET_TO(ms_pObjectPool,              aml->GetSym(pGameHandle, "_ZN6CPools14ms_pObjectPoolE"));
+    SET_TO(ms_pVehiclePool,             aml->GetSym(pGameHandle, "_ZN6CPools15ms_pVehiclePoolE"));
 }
 
 void SAUtils::InitializeSAUtils()
@@ -1206,6 +1217,42 @@ eLoadedGame SAUtils::GetLoadedGame()
 uintptr_t SAUtils::GetLoadedGameLibAddress()
 {
     return pGameLib;
+}
+
+int SAUtils::GetPoolSize(ePoolType poolType)
+{
+    switch(poolType)
+    {
+        case POOLTYPE_PEDS:
+            if(!*ms_pPedPool) return 0;
+            return (*ms_pPedPool)->m_nSize;
+        case POOLTYPE_VEHICLES:
+            if(!*ms_pVehiclePool) return 0;
+            return (*ms_pVehiclePool)->m_nSize;
+        case POOLTYPE_OBJECTS:
+            if(!*ms_pObjectPool) return 0;
+            return (*ms_pObjectPool)->m_nSize;
+
+        default: return 0;
+    }
+}
+
+int SAUtils::GetPoolMemSize(ePoolType poolType)
+{
+    switch(poolType)
+    {
+        case POOLTYPE_PEDS:
+            if(!*ms_pPedPool) return 0;
+            return (*ms_pPedPool)->m_nSize * (*ms_pPedPool)->GetObjectSize();
+        case POOLTYPE_VEHICLES:
+            if(!*ms_pVehiclePool) return 0;
+            return (*ms_pVehiclePool)->m_nSize * (*ms_pVehiclePool)->GetObjectSize();
+        case POOLTYPE_OBJECTS:
+            if(!*ms_pObjectPool) return 0;
+            return (*ms_pObjectPool)->m_nSize * (*ms_pObjectPool)->GetObjectSize();
+
+        default: return 0;
+    }
 }
 
 static SAUtils sautilsLocal;

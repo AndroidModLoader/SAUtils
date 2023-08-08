@@ -102,6 +102,10 @@ public:
     eLoadedGame     GetLoadedGame();
     uintptr_t       GetLoadedGameLibAddress();
 
+    // 1.5.1
+    int             GetPoolSize(ePoolType poolType);
+    int             GetPoolMemSize(ePoolType poolType);
+
 public:
     eLoadedGame     m_eLoadedGame;
     uintptr_t       m_pHasFLA;

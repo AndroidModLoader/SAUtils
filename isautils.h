@@ -149,6 +149,15 @@ enum eSettingsTabButtonLoc : unsigned char
     TABBUTTONLOC_MAX,
 };
 
+enum ePoolType : unsigned char
+{
+    POOLTYPE_PEDS,
+    POOLTYPE_VEHICLES,
+    POOLTYPE_OBJECTS,
+
+    POOLTYPES_MAX,
+};
+
 /* Interface */
 class ISAUtils
 {
@@ -530,6 +539,23 @@ public:
      *  \return The game library address
      */
     virtual uintptr_t GetLoadedGameLibAddress() = 0;
+
+
+/* Functions below added in 1.5.1.0 */
+
+    /** Returns a number of items allocated in a pool
+     *
+     *  \param poolType Enumeration of which pool size you needed
+     *  \return A size of Object pool (returns 0 if there is any error)
+     */
+    virtual int GetPoolSize(ePoolType poolType) = 0;
+
+    /** Returns a number of allocated memory count for a pool
+     *
+     *  \param poolType Enumeration of which pool size you needed
+     *  \return An allocated memory size of Object pool (returns 0 if there is any error)
+     */
+    virtual int GetPoolMemSize(ePoolType poolType) = 0;
 };
 
 #endif // _SAUTILS_INTERFACE

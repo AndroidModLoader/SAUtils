@@ -6,7 +6,9 @@
 #include <vector>
 #include <cstring> // memcpy, memcmp
 
+#include "AArch64_ModHelper/Thumbv7_ASMHelper.h"
 #include "GTASA_STRUCTS.h"
+using namespace ThumbV7;
 
 MYMODDECL();
 extern uintptr_t pGameLib;
@@ -40,6 +42,11 @@ bool            g_bIsGameStartedAlready = false;
 MobileSettings::Setting                pNewSettings[MAX_SETTINGS] {0}; // A new char MobileSettings::settings[37*8*4]
 CWidget*                               pNewWidgets[MAX_WIDGETS] {NULL};
 CStreamingFile                         pNewStreamingFiles[MAX_IMG_ARCHIVES + 2] {0}; // A new char CStreaming::ms_files[48 * 8]; // 0 and 1 are used for player and something
+
+/* Vars */
+CPool<CPed, CCopPed> **ms_pPedPool;
+CPool<CVehicle, CHeli> **ms_pVehiclePool;
+CPool<CObject, CCutsceneObject> **ms_pObjectPool;
 
 /* Funcs */
 typedef void* (*SettingsAddItemFn)(SelectScreen* a1, SelectScreen::MenuSelection* a2);
@@ -665,6 +672,11 @@ void SAUtils::InitializeFunctions()
     _ZTVN12SelectScreen16SettingSelectionE += 2*sizeof(void*);
     SET_TO(_ZTV13DisplayScreen, aml->GetSym(pGameHandle, "_ZTV13DisplayScreen"));
     _ZTV13DisplayScreen += 2*sizeof(void*);
+
+    // And also variables
+    SET_TO(ms_pPedPool,                 aml->GetSym(pGameHandle, "_ZN6CPools11ms_pPedPoolE"));
+    SET_TO(ms_pObjectPool,              aml->GetSym(pGameHandle, "_ZN6CPools14ms_pObjectPoolE"));
+    SET_TO(ms_pVehiclePool,             aml->GetSym(pGameHandle, "_ZN6CPools15ms_pVehiclePoolE"));
 }
 
 void SAUtils::InitializeSAUtils()
@@ -725,9 +737,9 @@ void SAUtils::InitializeSAUtils()
 
     // Hooked settings functions
     aml->Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;
-    aml->Redirect(pGameLib + 0x2A49F6 + 0x1, (uintptr_t)NewScreen_Game_stub); NewScreen_Game_backto = pGameLib + 0x2A4A1E + 0x1;
-    aml->Redirect(pGameLib + 0x2A4BD4 + 0x1, (uintptr_t)NewScreen_Display_stub); NewScreen_Display_backto = pGameLib + 0x2A4BFC + 0x1;
-    aml->Redirect(pGameLib + 0x2A4D3C + 0x1, (uintptr_t)NewScreen_Audio_stub); NewScreen_Audio_backto = pGameLib + 0x2A4D64 + 0x1;
+    aml->Redirect(pGameLib + 0x2A49F6 + 0x1, (uintptr_t)NewScreen_Game_stub);     NewScreen_Game_backto = pGameLib + 0x2A4A1E + 0x1;
+    aml->Redirect(pGameLib + 0x2A4BD4 + 0x1, (uintptr_t)NewScreen_Display_stub);  NewScreen_Display_backto = pGameLib + 0x2A4BFC + 0x1;
+    aml->Redirect(pGameLib + 0x2A4D3C + 0x1, (uintptr_t)NewScreen_Audio_stub);    NewScreen_Audio_backto = pGameLib + 0x2A4D64 + 0x1;
     HOOKPLT(NewScreen_Language,         pGameLib + 0x675D90);
 
     // Slider drawing hook
@@ -1258,6 +1270,42 @@ eLoadedGame SAUtils::GetLoadedGame()
 uintptr_t SAUtils::GetLoadedGameLibAddress()
 {
     return pGameLib;
+}
+
+int SAUtils::GetPoolSize(ePoolType poolType)
+{
+    switch(poolType)
+    {
+        case POOLTYPE_PEDS:
+            if(!*ms_pPedPool) return 0;
+            return (*ms_pPedPool)->m_nSize;
+        case POOLTYPE_VEHICLES:
+            if(!*ms_pVehiclePool) return 0;
+            return (*ms_pVehiclePool)->m_nSize;
+        case POOLTYPE_OBJECTS:
+            if(!*ms_pObjectPool) return 0;
+            return (*ms_pObjectPool)->m_nSize;
+
+        default: return 0;
+    }
+}
+
+int SAUtils::GetPoolMemSize(ePoolType poolType)
+{
+    switch(poolType)
+    {
+        case POOLTYPE_PEDS:
+            if(!*ms_pPedPool) return 0;
+            return (*ms_pPedPool)->m_nSize * (*ms_pPedPool)->GetObjectSize();
+        case POOLTYPE_VEHICLES:
+            if(!*ms_pVehiclePool) return 0;
+            return (*ms_pVehiclePool)->m_nSize * (*ms_pVehiclePool)->GetObjectSize();
+        case POOLTYPE_OBJECTS:
+            if(!*ms_pObjectPool) return 0;
+            return (*ms_pObjectPool)->m_nSize * (*ms_pObjectPool)->GetObjectSize();
+
+        default: return 0;
+    }
 }
 
 static SAUtils sautilsLocal;
