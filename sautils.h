@@ -7,34 +7,35 @@
 
 struct AdditionalSetting
 {
-    int                nSettingId;
-    eTypeOfSettings    eType;
-    const char*        szName;
-    OnSettingChangedFn fnOnValueChange;
-    OnSettingDrawedFn  fnOnValueDraw;
-    OnButtonPressedFn  fnOnButtonPressed;
-    eTypeOfItem        byteItemType;
-    int                nInitVal;
-    int                nSavedVal;
-    int                nMaxVal;
-    void*              pOwnData;
+    int                     nSettingId;
+    eTypeOfSettings         eType;
+    char                    szName[32];
+    OnSettingChangedFn      fnOnValueChange;
+    OnSettingDrawedFn       fnOnValueDraw;
+    OnButtonPressedFn       fnOnButtonPressed;
+    eTypeOfItem             byteItemType;
+    int                     nInitVal;
+    int                     nSavedVal;
+    int                     nMaxVal;
+    void*                   pOwnData;
 };
 
 struct AdditionalSettingsButton
 {
-    const char*        szName;
-    const char*        szTextureName;
-    bool               bUsesMenu;
-    SimpleDataFn       fnButtonPressed;
-    eSettingsTabButtonLoc nBtnLoc;
-    void*              pMenuData;
+    char                    szName[32];
+    char                    szTextureName[32];
+    bool                    bUsesMenu;
+    SimpleDataFn            fnButtonPressed;
+    eSettingsTabButtonLoc   nBtnLoc;
+    void*                   pMenuData;
 };
 
 struct AdditionalTexDB
 {
-    const char*        szName;
-    bool               bRegister;
-    uintptr_t          nDBPointer;
+    char                    szName[32];
+    bool                    bRegister;
+    uint8_t                 cacheType;
+    uintptr_t               nDBPointer;
 };
 
 class SAUtils : public ISAUtils
@@ -103,6 +104,7 @@ public:
     uintptr_t       GetLoadedGameLibAddress();
 
     // 1.5.1
+    uintptr_t*      AddTextureDBOfType(const char* name, eTexDBType type, bool registerMe = false);
     int             GetPoolSize(ePoolType poolType);
     int             GetPoolMemSize(ePoolType poolType);
     int             GetPoolIndex(void* entityPtr);

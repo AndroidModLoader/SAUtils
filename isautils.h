@@ -158,6 +158,15 @@ enum ePoolType : unsigned char
     POOLTYPES_MAX,
 };
 
+enum eTexDBType : unsigned char
+{
+    TEXDBTYPE_DXT,
+    TEXDBTYPE_ETC,
+    TEXDBTYPE_PVR,
+
+    TEXDBTYPES_MAX,
+};
+
 /* Interface */
 class ISAUtils
 {
@@ -542,6 +551,15 @@ public:
 
 
 /* Functions below added in 1.5.1.0 */
+
+    /** Loads texture db
+     *
+     *  \param name Obviously a name of texdb
+     *  \param type A type of the texture database: DXT, ETC, PVR
+     *  \param registerMe Should this texdb be registered for searching in or just be loaded until we register it manually?
+     *  \return Pointer of value that contains loaded TexDB address
+     */
+    virtual uintptr_t* AddTextureDBOfType(const char* name, eTexDBType type, bool registerMe = false);
 
     /** Returns a number of items allocated in a pool
      *

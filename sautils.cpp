@@ -349,7 +349,7 @@ DECL_HOOKv(InitialiseRenderWare)
     while(vStart != vEnd)
     {
         tdb = *vStart;
-        tdb->nDBPointer = LoadTextureDB(tdb->szName, false, 5);
+        tdb->nDBPointer = LoadTextureDB(tdb->szName, false, tdb->cacheType);
         if(tdb->nDBPointer != 0 && tdb->bRegister) RegisterTexDB(tdb->nDBPointer);
         ++vStart;
     }
@@ -795,7 +795,7 @@ int SAUtils::AddSettingsItem(eTypeOfSettings typeOf, const char* name, int initV
     AdditionalSetting* pNew = new AdditionalSetting;
     pNew->nSettingId = nNextSettingNum;
     pNew->eType = typeOf;
-    pNew->szName = name;
+    strncpy(pNew->szName, name, 32);
     pNew->fnOnValueChange = fnOnValueChange;
     pNew->byteItemType = isSlider ? ItemType_Slider : ItemType_WithItems;
     pNew->nInitVal = (int)initVal;
@@ -834,7 +834,7 @@ int SAUtils::AddClickableItem(eTypeOfSettings typeOf, const char* name, int init
     AdditionalSetting* pNew = new AdditionalSetting;
     pNew->nSettingId = nNextSettingNum;
     pNew->eType = typeOf;
-    pNew->szName = name;
+    strncpy(pNew->szName, name, 32);
     pNew->fnOnValueChange = fnOnValueChange;
     pNew->fnOnValueDraw = NULL;
     pNew->fnOnButtonPressed = NULL;
@@ -867,7 +867,7 @@ int SAUtils::AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal
     AdditionalSetting* pNew = new AdditionalSetting;
     pNew->nSettingId = nNextSettingNum;
     pNew->eType = typeOf;
-    pNew->szName = name;
+    strncpy(pNew->szName, name, 32);
     pNew->fnOnValueChange = fnOnValueChange;
     pNew->fnOnValueDraw = fnOnValueDraw;
     pNew->fnOnButtonPressed = NULL;
@@ -894,7 +894,7 @@ void SAUtils::AddButton(eTypeOfSettings typeOf, const char* name, OnButtonPresse
     AdditionalSetting* pNew = new AdditionalSetting;
     pNew->nSettingId = -1;
     pNew->eType = typeOf;
-    pNew->szName = name;
+    strncpy(pNew->szName, name, 32);
     pNew->fnOnValueChange = NULL;
     pNew->fnOnValueDraw = NULL;
     pNew->fnOnButtonPressed = fnOnButtonPressed;
@@ -909,14 +909,15 @@ uintptr_t* SAUtils::AddTextureDB(const char* name, bool registerMe)
 {
     if(!name || !name[0]) return NULL;
     AdditionalTexDB* pNew = new AdditionalTexDB;
-    pNew->szName = name;
+    strncpy(pNew->szName, name, 32);
     pNew->bRegister = registerMe;
+    pNew->cacheType = 6;
     pNew->nDBPointer = 0;
     gMoreTexDBs.push_back(pNew);
 
     if(g_bIsGameStartedAlready)
     {
-        pNew->nDBPointer = LoadTextureDB(name, false, 5);
+        pNew->nDBPointer = LoadTextureDB(name, false, 6);
         if(pNew->nDBPointer != 0 && registerMe) RegisterTexDB(pNew->nDBPointer);
     }
     return &pNew->nDBPointer;
@@ -940,8 +941,8 @@ static unsigned char nTabsIdCount = SETTINGS_COUNT-1;
 eTypeOfSettings SAUtils::AddSettingsTab(const char* name, const char* textureName)
 {
     AdditionalSettingsButton* pNew = new AdditionalSettingsButton;
-    pNew->szName = name;
-    pNew->szTextureName = textureName;
+    strncpy(pNew->szName, name, 32);
+    strncpy(pNew->szTextureName, textureName, 32);
     pNew->bUsesMenu = true;
     gMoreSettingButtons[STB_Settings].push_back(pNew);
     return (eTypeOfSettings)(++nTabsIdCount);
@@ -1224,8 +1225,8 @@ void SAUtils::AddOnRenderListener(eRenderOfType typeOf, SimpleDataFn fn)
 void SAUtils::AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsTabButtonLoc loc, const char* textureName, void* data)
 {
     AdditionalSettingsButton* pNew = new AdditionalSettingsButton;
-    pNew->szName = name;
-    pNew->szTextureName = textureName;
+    strncpy(pNew->szName, name, 32);
+    strncpy(pNew->szTextureName, textureName, 32);
     pNew->bUsesMenu = false;
     pNew->pMenuData = data;
     pNew->fnButtonPressed = fn;
@@ -1270,6 +1271,30 @@ eLoadedGame SAUtils::GetLoadedGame()
 uintptr_t SAUtils::GetLoadedGameLibAddress()
 {
     return pGameLib;
+}
+
+// 1.5.1
+uintptr_t* SAUtils::AddTextureDBOfType(const char* name, eTexDBType type, bool registerMe)
+{
+    if(type >= TEXDBTYPES_MAX || !name || !name[0]) return NULL;
+    AdditionalTexDB* pNew = new AdditionalTexDB;
+    strncpy(pNew->szName, name, 32);
+    pNew->bRegister = registerMe;
+    switch(type)
+    {
+        case TEXDBTYPE_ETC: pNew->cacheType = 5; break;
+        case TEXDBTYPE_PVR: pNew->cacheType = 4; break;
+        default: pNew->cacheType = 1; break; // DXT
+    }
+    pNew->nDBPointer = 0;
+    gMoreTexDBs.push_back(pNew);
+
+    if(g_bIsGameStartedAlready)
+    {
+        pNew->nDBPointer = LoadTextureDB(name, false, pNew->cacheType);
+        if(pNew->nDBPointer != 0 && registerMe) RegisterTexDB(pNew->nDBPointer);
+    }
+    return &pNew->nDBPointer;
 }
 
 int SAUtils::GetPoolSize(ePoolType poolType)
