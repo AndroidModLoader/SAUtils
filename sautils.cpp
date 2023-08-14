@@ -264,7 +264,7 @@ MobileMenu* OnModSettingsOpened()
     
     if(gMobileMenu->m_nScreensCount > 0)
     {
-        (*(void(**)(SelectScreen*, int))(menuScreenPointer->vtable() + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
+        menuScreenPointer->SetPreviousScreen(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]);
     }
     if(gMobileMenu->m_pTopScreen != NULL) ProcessMenuPending(gMobileMenu);
     gMobileMenu->m_pTopScreen = menuScreenPointer;
@@ -282,9 +282,9 @@ MobileMenu* OnTabButtonClicked()
 
 MobileMenu* OnCustomModSettingsOpened()
 {
-    nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton - 6);
+    nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton);
     CharSelectScreen* menuScreenPointer = New<CharSelectScreen>();
-    InitializeMenuPtr(menuScreenPointer, gMoreSettingButtons[STB_Settings][nCurrentItemTab]->szName, true);
+    InitializeMenuPtr(menuScreenPointer, gMoreSettingButtons[STB_Settings][nCurrentItemTab - SETTINGS_COUNT]->szName, true);
     menuScreenPointer->vtable() = _ZTV13DisplayScreen; // Vtable
 
     AddSettingsToScreen(menuScreenPointer); // Custom items
@@ -292,7 +292,7 @@ MobileMenu* OnCustomModSettingsOpened()
     menuScreenPointer->renderLastAtBottom = false;
     if(gMobileMenu->m_nScreensCount)
     {
-        (*(void(**)(MenuScreen*, int))(*(int*)menuScreenPointer + 20))(menuScreenPointer, *(int*)(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]));
+        menuScreenPointer->SetPreviousScreen(gMobileMenu->m_pScreens[gMobileMenu->m_nScreensCount - 1]);
     }
     if(gMobileMenu->m_pTopScreen != NULL) ProcessMenuPending(gMobileMenu);
     gMobileMenu->m_pTopScreen = menuScreenPointer;
@@ -937,7 +937,7 @@ void SAUtils::AddIMG(const char* imgName)
 }
 
 // 1.3
-static unsigned char nTabsIdCount = SETTINGS_COUNT-1;
+static unsigned char nTabsIdCount = SETTINGS_COUNT - 1;
 eTypeOfSettings SAUtils::AddSettingsTab(const char* name, const char* textureName)
 {
     AdditionalSettingsButton* pNew = new AdditionalSettingsButton;
@@ -1232,7 +1232,7 @@ void SAUtils::AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsT
     pNew->fnButtonPressed = fn;
     pNew->nBtnLoc = loc;
     gMoreSettingButtons[loc].push_back(pNew);
-    ++nTabsIdCount;
+    if(loc == STB_Settings) ++nTabsIdCount;
 }
 
 bool SAUtils::LoadDFF(const char* name, bool doPrelit, RpAtomic** atomic, RwFrame** frame)

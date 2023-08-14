@@ -282,9 +282,9 @@ MobileMenu* OnTabButtonClicked()
 
 MobileMenu* OnCustomModSettingsOpened()
 {
-    nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton - 6);
+    nCurrentItemTab = (eTypeOfSettings)(curScr->m_nChosenButton);
     CharSelectScreen* menuScreenPointer = New<CharSelectScreen>();
-    InitializeMenuPtr(menuScreenPointer, gMoreSettingButtons[STB_Settings][nCurrentItemTab]->szName, true);
+    InitializeMenuPtr(menuScreenPointer, gMoreSettingButtons[STB_Settings][nCurrentItemTab - SETTINGS_COUNT]->szName, true);
     menuScreenPointer->vtable() = _ZTV13DisplayScreen; // Vtable
 
     AddSettingsToScreen(menuScreenPointer); // Custom items
@@ -890,7 +890,7 @@ void SAUtils::AddIMG(const char* imgName)
 }
 
 // 1.3
-static unsigned char nTabsIdCount = SETTINGS_COUNT-1;
+static unsigned char nTabsIdCount = SETTINGS_COUNT - 2;
 eTypeOfSettings SAUtils::AddSettingsTab(const char* name, const char* textureName)
 {
     AdditionalSettingsButton* pNew = new AdditionalSettingsButton;
@@ -1179,7 +1179,7 @@ void SAUtils::AddSettingsTabButton(const char* name, SimpleDataFn fn, eSettingsT
     pNew->fnButtonPressed = fn;
     pNew->nBtnLoc = loc;
     gMoreSettingButtons[loc].push_back(pNew);
-    ++nTabsIdCount;
+    if(loc == STB_Settings) ++nTabsIdCount;
 }
 
 bool SAUtils::LoadDFF(const char* name, bool doPrelit, RpAtomic** atomic, RwFrame** frame)
