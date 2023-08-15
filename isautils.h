@@ -583,6 +583,14 @@ public:
      *  \return An index of a value (value less than 0 if error occured)
      */
     virtual int GetPoolIndex(void* entityPtr) = 0;
+
+    /** Returns a pool member locate at the index
+     *
+     *  \param poolType Enumeration of which pool's member pointer you needed
+     *  \param index An index
+     *  \return A pointer of a value located at the index (value is NULL if any error occured or member doesnt exists)
+     */
+    virtual void* GetPoolMember(ePoolType poolType, int index) = 0;
 };
 
 #endif // _SAUTILS_INTERFACE

@@ -108,6 +108,7 @@ public:
     int             GetPoolSize(ePoolType poolType);
     int             GetPoolMemSize(ePoolType poolType);
     int             GetPoolIndex(void* entityPtr);
+    void*           GetPoolMember(ePoolType poolType, int index);
 
 public:
     eLoadedGame     m_eLoadedGame;

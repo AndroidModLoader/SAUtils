@@ -1372,5 +1372,23 @@ int SAUtils::GetPoolIndex(void* entityPtr)
     }
 }
 
+void* SAUtils::GetPoolMember(ePoolType poolType, int index)
+{
+    switch(poolType)
+    {
+        case POOLTYPE_PEDS:
+            if(!*ms_pPedPool) return NULL;
+            return (*ms_pPedPool)->GetAt(index);
+        case POOLTYPE_VEHICLES:
+            if(!*ms_pVehiclePool) return NULL;
+            return (*ms_pVehiclePool)->GetAt(index);
+        case POOLTYPE_OBJECTS:
+            if(!*ms_pObjectPool) return NULL;
+            return (*ms_pObjectPool)->GetAt(index);
+
+        default: return NULL;
+    }
+}
+
 static SAUtils sautilsLocal;
 ISAUtils* sautils = &sautilsLocal;
