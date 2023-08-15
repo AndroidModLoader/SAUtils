@@ -135,6 +135,8 @@ enum eRenderOfType : unsigned char
     ROfType_Ped,
     ROfType_Vehicle,
     ROfType_Object,
+    ROfType_RadarBlips,
+    ROfType_MapBlips,
 
     RENDEROFTYPE_MAX
 };

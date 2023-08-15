@@ -537,6 +537,29 @@ DECL_HOOKv(RenderObject, void* self)
         gRenderOfTypeFns[ROfType_Object][i](self);
     }
 }
+DECL_HOOKv(DrawRadarBlips, float circleSize)
+{
+    DrawRadarBlips(circleSize);
+
+    if(gMobileMenu->m_bDrawMenuMap)
+    {
+        int size = gRenderOfTypeFns[ROfType_MapBlips].size();
+        for(int i = 0; i < size; ++i)
+        {
+            float circSize = circleSize;
+            gRenderOfTypeFns[ROfType_MapBlips][i]((void*)&circSize);
+        }
+    }
+    else
+    {
+        int size = gRenderOfTypeFns[ROfType_RadarBlips].size();
+        for(int i = 0; i < size; ++i)
+        {
+            float circSize = circleSize;
+            gRenderOfTypeFns[ROfType_RadarBlips][i]((void*)&circSize);
+        }
+    }
+}
 DECL_HOOKv(MainMenuAddItems, FlowScreen* self)
 {
     MainMenuAddItems(self);
@@ -727,13 +750,15 @@ void SAUtils::InitializeSAUtils()
     HOOKPLT(InitialiseGame_SecondPass,  pGameLib + 0x672178);
     HOOKPLT(PlayerProcess,              pGameLib + 0x673E84);
     HOOK(RenderEffects,                 aml->GetSym(pGameHandle, "_Z13RenderEffectsv"));
-    HOOK(RenderMenu,                    aml->GetSym(pGameHandle, "_ZN10MobileMenu6RenderEv"));
+    HOOKPLT(RenderMenu,                 pGameLib + 0x674254);
     HOOK(RenderPed,                     aml->GetSym(pGameHandle, "_ZN4CPed6RenderEv"));
     HOOK(RenderVehicle,                 aml->GetSym(pGameHandle, "_ZN8CVehicle6RenderEv"));
     HOOK(RenderObject,                  aml->GetSym(pGameHandle, "_ZN7CObject6RenderEv"));
-    HOOK(GetTextureFromDB_HOOKED,       aml->GetSym(pGameHandle, "_ZN22TextureDatabaseRuntime10GetTextureEPKc"));
-    HOOK(MainMenuAddItems,              aml->GetSym(pGameHandle, "_ZN14MainMenuScreen11AddAllItemsEv"));
-    HOOK(StartGameAddItems,             aml->GetSym(pGameHandle, "_ZN14MainMenuScreen11OnStartGameEv"));
+    HOOKPLT(DrawRadarBlips,             pGameLib + 0x66E910);
+    HOOKPLT(GetTextureFromDB_HOOKED,    pGameLib + 0x674708);
+    HOOKPLT(MainMenuAddItems,           pGameLib + 0x67379C);
+    //HOOK(StartGameAddItems,             aml->GetSym(pGameHandle, "_ZN14MainMenuScreen11OnStartGameEv"));
+    HOOKPLT(StartGameAddItems,          pGameLib + 0x662AD8); // vtable fn
 
     // Hooked settings functions
     aml->Redirect(pGameLib + 0x29E6AA + 0x1, (uintptr_t)NewScreen_Controls_stub); NewScreen_Controls_backto = pGameLib + 0x29E6D2 + 0x1;

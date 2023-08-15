@@ -525,6 +525,29 @@ DECL_HOOKv(RenderObject, void* self)
         gRenderOfTypeFns[ROfType_Object][i](self);
     }
 }
+DECL_HOOKv(DrawRadarBlips, float circleSize)
+{
+    DrawRadarBlips(circleSize);
+
+    if(gMobileMenu->m_bDrawMenuMap)
+    {
+        int size = gRenderOfTypeFns[ROfType_MapBlips].size();
+        for(int i = 0; i < size; ++i)
+        {
+            float circSize = circleSize;
+            gRenderOfTypeFns[ROfType_MapBlips][i]((void*)&circSize);
+        }
+    }
+    else
+    {
+        int size = gRenderOfTypeFns[ROfType_RadarBlips].size();
+        for(int i = 0; i < size; ++i)
+        {
+            float circSize = circleSize;
+            gRenderOfTypeFns[ROfType_RadarBlips][i]((void*)&circSize);
+        }
+    }
+}
 DECL_HOOKv(MainMenuAddItems, FlowScreen* self)
 {
     MainMenuAddItems(self);
@@ -710,6 +733,7 @@ void SAUtils::InitializeSAUtils()
     HOOK(RenderPed,                     aml->GetSym(pGameHandle, "_ZN4CPed6RenderEv"));
     HOOK(RenderVehicle,                 aml->GetSym(pGameHandle, "_ZN8CVehicle6RenderEv"));
     HOOK(RenderObject,                  aml->GetSym(pGameHandle, "_ZN7CObject6RenderEv"));
+    HOOKPLT(DrawRadarBlips,             pGameLib + 0x83DED0);
     HOOKPLT(GetTextureFromDB_HOOKED,    pGameLib + 0x8477C8);
     HOOKPLT(MainMenuAddItems,           pGameLib + 0x845E50);
     HOOKPLT(StartGameAddItems,          pGameLib + 0x8264B0); // vtable fn
