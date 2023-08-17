@@ -623,10 +623,32 @@ public:
      *  \param x X coordinate
      *  \param y Y coordinate
      *  \param z Z coordinate
-     *  \param ref An optional pointer to save the script's handle of this car
+     *  \param ref An optional pointer to save the script's handle of this ped
      *  \return Ped pointer (always check if it's NULL)
      */
     virtual CPed* CreatePed(int pedType, int modelId, float x, float y, float z, int *ref = NULL);
+
+    /** Creates vehicle
+     *
+     *  \param modelId Id of the model
+     *  \param x X coordinate
+     *  \param y Y coordinate
+     *  \param z Z coordinate
+     *  \param ref An optional pointer to save the script's handle of this car
+     *  \return Vehicle pointer (always check if it's NULL)
+     */
+    virtual CVehicle* CreateVehicle(int modelId, float x, float y, float z, int *ref = NULL);
+
+    /** Creates object
+     *
+     *  \param modelId Id of the model
+     *  \param x X coordinate
+     *  \param y Y coordinate
+     *  \param z Z coordinate
+     *  \param ref An optional pointer to save the script's handle of this object
+     *  \return Object pointer (always check if it's NULL)
+     */
+    virtual CObject* CreateObject(int modelId, float x, float y, float z, int *ref = NULL);
 };
 
 #endif // _SAUTILS_INTERFACE

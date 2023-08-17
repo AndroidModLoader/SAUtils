@@ -114,6 +114,8 @@ public:
     bool            IsGameInitialised();
     void            SetPosition(CPhysical* ent, float x, float y, float z, bool resetRotation = false);
     CPed*           CreatePed(int pedType, int modelId, float x, float y, float z, int *ref = NULL);
+    CVehicle*       CreateVehicle(int modelId, float x, float y, float z, int *ref = NULL);
+    CObject*        CreateObject(int modelId, float x, float y, float z, int *ref = NULL);
 
 public:
     eLoadedGame     m_eLoadedGame;

@@ -1359,9 +1359,25 @@ CPed* SAUtils::CreatePed(int pedType, int modelId, float x, float y, float z, in
     int scmHandle = 0;
     ScriptCommand(&scm_CREATE_CHAR, pedType, modelId, x, y, z, &scmHandle);
     if(ref) *ref = scmHandle;
-    if(!scmHandle) return NULL;
-
     return GetPedFromRef(scmHandle);
+}
+
+CVehicle* SAUtils::CreateVehicle(int modelId, float x, float y, float z, int *ref)
+{
+    static DEFOPCODE(00A5, CREATE_CAR, "ifffv");
+    int scmHandle = 0;
+    ScriptCommand(&scm_CREATE_CAR, modelId, x, y, z, &scmHandle);
+    if(ref) *ref = scmHandle;
+    return GetVehicleFromRef(scmHandle);
+}
+
+CObject* SAUtils::CreateObject(int modelId, float x, float y, float z, int *ref)
+{
+    static DEFOPCODE(0107, CREATE_OBJECT, "ifffv");
+    int scmHandle = 0;
+    ScriptCommand(&scm_CREATE_OBJECT, modelId, x, y, z, &scmHandle);
+    if(ref) *ref = scmHandle;
+    return GetObjectFromRef(scmHandle);
 }
 
 static SAUtils sautilsLocal;
