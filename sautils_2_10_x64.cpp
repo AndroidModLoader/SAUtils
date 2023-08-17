@@ -1353,6 +1353,51 @@ void SAUtils::SetPosition(CPhysical* ent, float x, float y, float z, bool resetR
     ent->Teleport({x, y, z}, resetRotation);
 }
 
+void SAUtils::SetAngle(CPhysical* ent, unsigned char axis, float angle)
+{
+    CMatrix* mat = ent->GetMatrix();
+    if(!mat) return;
+    
+    angle *= 0.01745329251f;
+    if(axis == 0) mat->SetRotateXOnly(angle);
+    else if(axis == 1) mat->SetRotateYOnly(angle);
+    else mat->SetRotateZOnly(angle);
+}
+
+void SAUtils::SetAngle(CPhysical* ent, float x, float y, float z)
+{
+    CMatrix* mat = ent->GetMatrix();
+    if(!mat) return;
+
+    bool bx = false, by = false, bz = false;
+    if(x >= -360 && x < 360.0f)
+    {
+        if(x < 0) x += 360.0f;
+        x *= 0.01745329251f;
+        bx = true;
+    }
+    if(y >= -360 && y < 360.0f)
+    {
+        if(y < 0) y += 360.0f;
+        y *= 0.01745329251f;
+        by = true;
+    }
+    if(z >= -360 && z < 360.0f)
+    {
+        if(z < 0) z += 360.0f;
+        z *= 0.01745329251f;
+        bz = true;
+    }
+
+    if(bx && by && bz) mat->SetRotateOnly(x, y, z);
+    else
+    {
+        if(bx) mat->SetRotateXOnly(x);
+        if(by) mat->SetRotateYOnly(y);
+        if(bz) mat->SetRotateZOnly(z);
+    }
+}
+
 CPed* SAUtils::CreatePed(int pedType, int modelId, float x, float y, float z, int *ref)
 {
     static DEFOPCODE(009A, CREATE_CHAR, "iifffv");

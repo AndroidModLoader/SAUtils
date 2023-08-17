@@ -113,6 +113,8 @@ public:
     // 1.5.2
     bool            IsGameInitialised();
     void            SetPosition(CPhysical* ent, float x, float y, float z, bool resetRotation = false);
+    void            SetAngle(CPhysical* ent, unsigned char axis, float angle);
+    void            SetAngle(CPhysical* ent, float x, float y, float z);
     CPed*           CreatePed(int pedType, int modelId, float x, float y, float z, int *ref = NULL);
     CVehicle*       CreateVehicle(int modelId, float x, float y, float z, int *ref = NULL);
     CObject*        CreateObject(int modelId, float x, float y, float z, int *ref = NULL);

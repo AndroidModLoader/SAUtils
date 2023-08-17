@@ -616,6 +616,25 @@ public:
      */
     virtual void SetPosition(CPhysical* ent, float x, float y, float z, bool resetRotation = false);
 
+    /** Set angles for physical (faster)
+     *
+     *  \param ent Any physical (entity, object, vehicle, ped)
+     *  \param axis An axis (x = 0, y = 1, z = 2)
+     *  \param angle An angle in degrees
+     *  \noreturn
+     */
+    virtual void SetAngle(CPhysical* ent, unsigned char axis, float angle);
+
+    /** Set angles for physical
+     *
+     *  \param ent Any physical (entity, object, vehicle, ped)
+     *  \param x X angle (from -359.99... to 359.99..., otherwise dont rotate)
+     *  \param y Y angle (from -359.99... to 359.99..., otherwise dont rotate)
+     *  \param z Z angle (from -359.99... to 359.99..., otherwise dont rotate)
+     *  \noreturn
+     */
+    virtual void SetAngle(CPhysical* ent, float x = -999, float y = -999, float z = -999);
+
     /** Creates ped
      *
      *  \param pedType Type of ped (ePedType, from 0 to 31)
