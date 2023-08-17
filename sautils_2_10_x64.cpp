@@ -246,7 +246,7 @@ eSettingsTabButtonLoc curLoc;
 MobileMenu* OnModSettingsOpened()
 {
     nCurrentItemTab = SetType_Mods;
-    snprintf(szSautilsVer, sizeof(szSautilsVer), "SAUtils v%s", modinfo->VersionString());
+    snprintf(szSautilsVer, sizeof(szSautilsVer), "SAUtils v%s (64-bit)", modinfo->VersionString());
     CharSelectScreen* menuScreenPointer = New<CharSelectScreen>();
     InitializeMenuPtr(menuScreenPointer, "Mods Settings", true);
     menuScreenPointer->vtable() = _ZTV13DisplayScreen; // Vtable
