@@ -98,10 +98,13 @@ void          (*RpClumpDestroy)(RpClump*);
 RwFrame*      (*RwFrameCreate)();
 void          (*RpAtomicSetFrame)(RpAtomic*, RwFrame*);
 void          (*RenderAtomicWithAlpha)(RpAtomic*, int alphaVal);
-RpGeometry*   (*RpGeometryCreate)(int, int, unsigned int); //
-RpMaterial*   (*RpGeometryTriangleGetMaterial)(RpGeometry*, RpTriangle*); //
-void          (*RpGeometryTriangleSetMaterial)(RpGeometry*, RpTriangle*, RpMaterial*); //
+RpGeometry*   (*RpGeometryCreate)(int, int, unsigned int);
+RpMaterial*   (*RpGeometryTriangleGetMaterial)(RpGeometry*, RpTriangle*);
+void          (*RpGeometryTriangleSetMaterial)(RpGeometry*, RpTriangle*, RpMaterial*);
 void          (*RpAtomicSetGeometry)(RpAtomic*, RpGeometry*, unsigned int);
+CPed*         (*GetPedFromRef)(int);
+CVehicle*     (*GetVehicleFromRef)(int);
+CObject*      (*GetObjectFromRef)(int);
 RpAtomicCallBackRender AtomicDefaultRenderCallBack;
 FSButtonCallback OnMainMenuExit;
 
@@ -681,6 +684,9 @@ void SAUtils::InitializeFunctions()
     SET_TO(RpGeometryTriangleSetMaterial, aml->GetSym(pGameHandle, "_Z29RpGeometryTriangleSetMaterialP10RpGeometryP10RpTriangleP10RpMaterial"));
     SET_TO(RpAtomicSetGeometry,         aml->GetSym(pGameHandle, "_Z19RpAtomicSetGeometryP8RpAtomicP10RpGeometryj"));
     SET_TO(AtomicDefaultRenderCallBack, aml->GetSym(pGameHandle, "_Z27AtomicDefaultRenderCallBackP8RpAtomic"));
+    SET_TO(GetPedFromRef,               aml->GetSym(pGameHandle, "_ZN6CPools6GetPedEi"));
+    SET_TO(GetVehicleFromRef,           aml->GetSym(pGameHandle, "_ZN6CPools10GetVehicleEi"));
+    SET_TO(GetObjectFromRef,            aml->GetSym(pGameHandle, "_ZN6CPools9GetObjectEi"));
     SET_TO(OnMainMenuExit,              aml->GetSym(pGameHandle, "_ZN14MainMenuScreen6OnExitEv"));
 
     SET_TO(gxtErrorString,              aml->GetSym(pGameHandle, "GxtErrorString"));
@@ -1394,6 +1400,22 @@ void* SAUtils::GetPoolMember(ePoolType poolType, int index)
 bool SAUtils::IsGameInitialised()
 {
     return g_bIsGameStartedAlready;
+}
+
+void SAUtils::SetPosition(CPhysical* ent, float x, float y, float z, bool resetRotation)
+{
+    ent->Teleport({x, y, z}, resetRotation);
+}
+
+CPed* SAUtils::CreatePed(int pedType, int modelId, float x, float y, float z, int *ref)
+{
+    static DEFOPCODE(009A, CREATE_CHAR, "iifffv");
+    int scmHandle = 0;
+    ScriptCommand(&scm_CREATE_CHAR, pedType, modelId, x, y, z, &scmHandle);
+    if(ref) *ref = scmHandle;
+    if(!scmHandle) return NULL;
+
+    return GetPedFromRef(scmHandle);
 }
 
 static SAUtils sautilsLocal;

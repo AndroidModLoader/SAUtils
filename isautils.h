@@ -26,6 +26,7 @@ DEFOPCODE(FFFF, CRASH_GAME, ); // CALLSCM(CRASH_GAME); calls an unknown opcode F
 class CWidgetButton;
 class RpAtomic;
 class RwFrame;
+class CPhysical;
 class CPed;
 class CObject;
 class CVehicle;
@@ -603,6 +604,29 @@ public:
      *  \return Is the game loaded
      */
     virtual bool IsGameInitialised();
+
+    /** Teleport physical
+     *
+     *  \param ent Any physical (entity, object, vehicle, ped)
+     *  \param x X coordinate
+     *  \param y Y coordinate
+     *  \param z Z coordinate
+     *  \param resetRotation Should i reset the rotation of this physical
+     *  \noreturn
+     */
+    virtual void SetPosition(CPhysical* ent, float x, float y, float z, bool resetRotation = false);
+
+    /** Creates ped
+     *
+     *  \param pedType Type of ped (ePedType, from 0 to 31)
+     *  \param modelId Id of the model
+     *  \param x X coordinate
+     *  \param y Y coordinate
+     *  \param z Z coordinate
+     *  \param ref An optional pointer to save the script's handle of this car
+     *  \return Ped pointer (always check if it's NULL)
+     */
+    virtual CPed* CreatePed(int pedType, int modelId, float x, float y, float z, int *ref = NULL);
 };
 
 #endif // _SAUTILS_INTERFACE

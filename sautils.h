@@ -112,6 +112,8 @@ public:
 
     // 1.5.2
     bool            IsGameInitialised();
+    void            SetPosition(CPhysical* ent, float x, float y, float z, bool resetRotation = false);
+    CPed*           CreatePed(int pedType, int modelId, float x, float y, float z, int *ref = NULL);
 
 public:
     eLoadedGame     m_eLoadedGame;
