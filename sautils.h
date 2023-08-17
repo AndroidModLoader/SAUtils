@@ -110,6 +110,9 @@ public:
     int             GetPoolIndex(void* entityPtr);
     void*           GetPoolMember(ePoolType poolType, int index);
 
+    // 1.5.2
+    bool            IsGameInitialised();
+
 public:
     eLoadedGame     m_eLoadedGame;
     uintptr_t       m_pHasFLA;

@@ -1390,5 +1390,11 @@ void* SAUtils::GetPoolMember(ePoolType poolType, int index)
     }
 }
 
+// 1.5.2
+bool SAUtils::IsGameInitialised()
+{
+    return g_bIsGameStartedAlready;
+}
+
 static SAUtils sautilsLocal;
 ISAUtils* sautils = &sautilsLocal;

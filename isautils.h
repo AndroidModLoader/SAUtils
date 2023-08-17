@@ -26,6 +26,9 @@ DEFOPCODE(FFFF, CRASH_GAME, ); // CALLSCM(CRASH_GAME); calls an unknown opcode F
 class CWidgetButton;
 class RpAtomic;
 class RwFrame;
+class CPed;
+class CObject;
+class CVehicle;
 
 /* Type definitions */
 typedef void        (*OnSettingChangedFn)(int nOldValue, int nNewValue, void* pData); // Has pData since v1.4
@@ -591,6 +594,15 @@ public:
      *  \return A pointer of a value located at the index (value is NULL if any error occured or member doesnt exists)
      */
     virtual void* GetPoolMember(ePoolType poolType, int index) = 0;
+
+
+/* Functions below added in 1.5.2.0 */
+
+    /** Is the game's engine has been loaded?
+     *
+     *  \return Is the game loaded
+     */
+    virtual bool IsGameInitialised();
 };
 
 #endif // _SAUTILS_INTERFACE

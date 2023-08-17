@@ -7,7 +7,7 @@
 #include <sautils_2_10.h>
 
 /* Same name but can be used for VC too! */
-MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.5.1, RusJJ)
+MYMOD(net.rusjj.gtasa.utils, SAUtils, 1.5.2, RusJJ)
 
 uintptr_t pGameLib = 0;
 void* pGameHandle = NULL;

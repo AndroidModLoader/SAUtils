@@ -914,7 +914,7 @@ void SAUtils::AddIMG(const char* imgName)
 }
 
 // 1.3
-static unsigned char nTabsIdCount = SETTINGS_COUNT - 2;
+static unsigned char nTabsIdCount = SETTINGS_COUNT - 1;
 eTypeOfSettings SAUtils::AddSettingsTab(const char* name, const char* textureName)
 {
     AdditionalSettingsButton* pNew = new AdditionalSettingsButton;
@@ -1334,6 +1334,12 @@ void* SAUtils::GetPoolMember(ePoolType poolType, int index)
 
         default: return NULL;
     }
+}
+
+// 1.5.2
+bool SAUtils::IsGameInitialised()
+{
+    return g_bIsGameStartedAlready;
 }
 
 static SAUtils sautilsLocal;
