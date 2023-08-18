@@ -1398,6 +1398,20 @@ void SAUtils::SetAngle(CPhysical* ent, float x, float y, float z)
     }
 }
 
+void SAUtils::LoadModelId(int modelId)
+{
+    static DEFOPCODE(0247, REQUEST_MODEL, "i");
+    static DEFOPCODE(038B, LOAD_ALL_MODELS_NOW, "");
+    ScriptCommand(&scm_REQUEST_MODEL, modelId);
+    ScriptCommand(&scm_LOAD_ALL_MODELS_NOW);
+}
+
+void SAUtils::LoadArea(float x, float y)
+{
+    static DEFOPCODE(04E4, REQUEST_COLLISION, "ff");
+    ScriptCommand(&scm_REQUEST_COLLISION, x, y);
+}
+
 CPed* SAUtils::CreatePed(int pedType, int modelId, float x, float y, float z, int *ref)
 {
     static DEFOPCODE(009A, CREATE_CHAR, "iifffv");

@@ -636,6 +636,21 @@ public:
      */
     virtual void SetAngle(CPhysical* ent, float x = -999, float y = -999, float z = -999);
 
+    /** Request model id to be loaded
+     *
+     *  \param modelId Id of the model
+     *  \noreturn
+     */
+    virtual void LoadModelId(int modelId);
+
+    /** Request the game to load collision at the specific area
+     *
+     *  \param x X coordinate
+     *  \param y Y coordinate
+     *  \noreturn
+     */
+    virtual void LoadArea(float x, float y);
+
     /** Creates ped
      *
      *  \param pedType Type of ped (ePedType, from 0 to 31)

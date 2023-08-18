@@ -115,6 +115,8 @@ public:
     void            SetPosition(CPhysical* ent, float x, float y, float z, bool resetRotation = false);
     void            SetAngle(CPhysical* ent, unsigned char axis, float angle);
     void            SetAngle(CPhysical* ent, float x, float y, float z);
+    void            LoadModelId(int modelId);
+    void            LoadArea(float x, float y);
     CPed*           CreatePed(int pedType, int modelId, float x, float y, float z, int *ref = NULL);
     CPed*           CreatePed(int pedType, int modelId, CVehicle* vehicle, int seat = -1, int *ref = NULL);
     CVehicle*       CreateVehicle(int modelId, float x, float y, float z, int *ref = NULL);
