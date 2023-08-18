@@ -27,6 +27,7 @@ class CWidgetButton;
 class RpAtomic;
 class RwFrame;
 class CPhysical;
+class CEntity;
 class CPed;
 class CObject;
 class CVehicle;
@@ -668,6 +669,22 @@ public:
      *  \return Object pointer (always check if it's NULL)
      */
     virtual CObject* CreateObject(int modelId, float x, float y, float z, int *ref = NULL);
+
+    /** Creates object
+     *
+     *  \param ent Supported entities (object, vehicle, ped)
+     *  \noreturn
+     */
+    virtual void MarkEntityAsNotNeeded(CEntity* ent);
+
+    /** Places a ped into a vehicle
+     *
+     *  \param ped Ped pointer
+     *  \param vehicle Vehicle pointer
+     *  \param seat Seat id (-1 = driver)
+     *  \noreturn
+     */
+    virtual void PutPedInVehicle(CPed* ped, CVehicle* vehicle, int seat = -1);
 };
 
 #endif // _SAUTILS_INTERFACE

@@ -9,11 +9,11 @@ struct AdditionalSetting
 {
     int                     nSettingId;
     eTypeOfSettings         eType;
+    eTypeOfItem             byteItemType;
     char                    szName[32];
     OnSettingChangedFn      fnOnValueChange;
     OnSettingDrawedFn       fnOnValueDraw;
     OnButtonPressedFn       fnOnButtonPressed;
-    eTypeOfItem             byteItemType;
     int                     nInitVal;
     int                     nSavedVal;
     int                     nMaxVal;
@@ -25,17 +25,17 @@ struct AdditionalSettingsButton
     char                    szName[32];
     char                    szTextureName[32];
     bool                    bUsesMenu;
-    SimpleDataFn            fnButtonPressed;
     eSettingsTabButtonLoc   nBtnLoc;
+    SimpleDataFn            fnButtonPressed;
     void*                   pMenuData;
 };
 
 struct AdditionalTexDB
 {
     char                    szName[32];
+    uintptr_t               nDBPointer;
     bool                    bRegister;
     uint8_t                 cacheType;
-    uintptr_t               nDBPointer;
 };
 
 class SAUtils : public ISAUtils
@@ -118,6 +118,8 @@ public:
     CPed*           CreatePed(int pedType, int modelId, float x, float y, float z, int *ref = NULL);
     CVehicle*       CreateVehicle(int modelId, float x, float y, float z, int *ref = NULL);
     CObject*        CreateObject(int modelId, float x, float y, float z, int *ref = NULL);
+    void            MarkEntityAsNotNeeded(CEntity* ent);
+    void            PutPedInVehicle(CPed* ped, CVehicle* vehicle, int seat = -1);
 
 public:
     eLoadedGame     m_eLoadedGame;

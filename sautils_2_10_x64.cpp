@@ -1425,5 +1425,41 @@ CObject* SAUtils::CreateObject(int modelId, float x, float y, float z, int *ref)
     return GetObjectFromRef(scmHandle);
 }
 
+void SAUtils::MarkEntityAsNotNeeded(CEntity* ent)
+{
+    static DEFOPCODE(01C2, MARK_CHAR_AS_NO_LONGER_NEEDED, "i");
+    static DEFOPCODE(01C3, MARK_CAR_AS_NO_LONGER_NEEDED, "i");
+    static DEFOPCODE(01C4, MARK_OBJECT_AS_NO_LONGER_NEEDED, "i");
+    switch(ent->m_nType)
+    {
+        default: return;
+
+        case ENTITY_TYPE_PED:
+            if(*ms_pPedPool != NULL && (*ms_pPedPool)->IsObjectValid((CPed*)ent)) ScriptCommand(&scm_MARK_CHAR_AS_NO_LONGER_NEEDED, (*ms_pPedPool)->GetRef((CPed*)ent));
+            return;
+        case ENTITY_TYPE_OBJECT:
+            if(*ms_pObjectPool != NULL && (*ms_pObjectPool)->IsObjectValid((CObject*)ent)) ScriptCommand(&scm_MARK_OBJECT_AS_NO_LONGER_NEEDED, (*ms_pObjectPool)->GetRef((CObject*)ent));
+            return;
+        case ENTITY_TYPE_VEHICLE:
+            if(*ms_pVehiclePool != NULL && (*ms_pVehiclePool)->IsObjectValid((CVehicle*)ent)) ScriptCommand(&scm_MARK_CAR_AS_NO_LONGER_NEEDED, (*ms_pVehiclePool)->GetRef((CVehicle*)ent));
+            return;
+    }
+}
+
+void SAUtils::PutPedInVehicle(CPed* ped, CVehicle* vehicle, int seat)
+{
+    static DEFOPCODE(072A, TASK_WARP_CHAR_INTO_CAR_AS_DRIVER, "ii");
+    static DEFOPCODE(0430, WARP_CHAR_INTO_CAR_AS_PASSENGER, "iii");
+    if(!*ms_pPedPool || *ms_pVehiclePool   ||
+       !(*ms_pPedPool)->IsObjectValid(ped) ||
+       !(*ms_pVehiclePool)->IsObjectValid(vehicle)) return;
+
+    int pedRef = (*ms_pPedPool)->GetRef(ped);
+    int vehicleRef = (*ms_pVehiclePool)->GetRef(vehicle);
+
+    if(seat < 0) ScriptCommand(&scm_TASK_WARP_CHAR_INTO_CAR_AS_DRIVER, pedRef, vehicleRef);
+    else ScriptCommand(&scm_WARP_CHAR_INTO_CAR_AS_PASSENGER, pedRef, vehicleRef, seat);
+}
+
 static SAUtils sautilsLocal;
 ISAUtils* sautils = &sautilsLocal;
