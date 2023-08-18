@@ -93,6 +93,7 @@ int ScriptSACommandInner(const SCRIPT_COMMAND *pScriptCommand, va_list ap)
             }
             default:
             {
+                logger->Error("An attempt to call opcode %04X with an unknown arguments description -> (%s)", pScriptCommand->opCode, pScriptCommand->params);
                 return 0;
             }
         }
