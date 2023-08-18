@@ -1461,6 +1461,22 @@ CPed* SAUtils::CreatePed(int pedType, int modelId, float x, float y, float z, in
     return GetPedFromRef(scmHandle);
 }
 
+CPed* SAUtils::CreatePed(int pedType, int modelId, CVehicle* vehicle, int seat, int *ref)
+{
+    static DEFOPCODE(0129, CREATE_CHAR_INSIDE_CAR, "iiiv");
+    static DEFOPCODE(01C8, CREATE_CHAR_AS_PASSENGER, "iiiiv");
+    int scmHandle = 0;
+    if(!*ms_pPedPool || *ms_pVehiclePool ||
+       !(*ms_pVehiclePool)->IsFromObjectArray(vehicle)) return NULL;
+
+    int vehicleRef = (*ms_pVehiclePool)->GetRef(vehicle);
+
+    if(seat < 0) ScriptCommand(&scm_CREATE_CHAR_INSIDE_CAR, vehicleRef, pedType, modelId, &scmHandle);
+    else ScriptCommand(&scm_CREATE_CHAR_AS_PASSENGER, vehicleRef, pedType, modelId, seat, &scmHandle);
+    if(ref) *ref = scmHandle;
+    return GetPedFromRef(scmHandle);
+}
+
 CVehicle* SAUtils::CreateVehicle(int modelId, float x, float y, float z, int *ref)
 {
     static DEFOPCODE(00A5, CREATE_CAR, "ifffv");
@@ -1518,7 +1534,7 @@ void SAUtils::PutPedInVehicle(CPed* ped, CVehicle* vehicle, int seat)
     int vehicleRef = (*ms_pVehiclePool)->GetRef(vehicle);
 
     if(seat < 0) ScriptCommand(&scm_TASK_WARP_CHAR_INTO_CAR_AS_DRIVER, pedRef, vehicleRef);
-    else  ScriptCommand(&scm_WARP_CHAR_INTO_CAR_AS_PASSENGER, pedRef, vehicleRef, seat);
+    else ScriptCommand(&scm_WARP_CHAR_INTO_CAR_AS_PASSENGER, pedRef, vehicleRef, seat);
 }
 
 static SAUtils sautilsLocal;

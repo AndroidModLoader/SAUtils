@@ -116,6 +116,7 @@ public:
     void            SetAngle(CPhysical* ent, unsigned char axis, float angle);
     void            SetAngle(CPhysical* ent, float x, float y, float z);
     CPed*           CreatePed(int pedType, int modelId, float x, float y, float z, int *ref = NULL);
+    CPed*           CreatePed(int pedType, int modelId, CVehicle* vehicle, int seat = -1, int *ref = NULL);
     CVehicle*       CreateVehicle(int modelId, float x, float y, float z, int *ref = NULL);
     CObject*        CreateObject(int modelId, float x, float y, float z, int *ref = NULL);
     void            MarkEntityAsNotNeeded(CEntity* ent);

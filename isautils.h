@@ -648,6 +648,17 @@ public:
      */
     virtual CPed* CreatePed(int pedType, int modelId, float x, float y, float z, int *ref = NULL);
 
+    /** Creates ped inside a vehicle
+     *
+     *  \param pedType Type of ped (ePedType, from 0 to 31)
+     *  \param modelId Id of the model
+     *  \param vehicle A vehicle ped should be spawned in
+     *  \param seat Seat id (-1 = driver)
+     *  \param ref An optional pointer to save the script's handle of this ped
+     *  \return Ped pointer (always check if it's NULL)
+     */
+    virtual CPed* CreatePed(int pedType, int modelId, CVehicle* vehicle, int seat = -1, int *ref = NULL);
+
     /** Creates vehicle
      *
      *  \param modelId Id of the model
