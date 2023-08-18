@@ -670,12 +670,19 @@ public:
      */
     virtual CObject* CreateObject(int modelId, float x, float y, float z, int *ref = NULL);
 
-    /** Creates object
+    /** Mark entity to be able to delete
      *
      *  \param ent Supported entities (object, vehicle, ped)
      *  \noreturn
      */
     virtual void MarkEntityAsNotNeeded(CEntity* ent);
+
+    /** Mark model id to be able to be freed by streaming
+     *
+     *  \param modelId Id of the model
+     *  \noreturn
+     */
+    virtual void MarkModelAsNotNeeded(int modelId);
 
     /** Places a ped into a vehicle
      *

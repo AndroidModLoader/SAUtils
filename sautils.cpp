@@ -1500,6 +1500,12 @@ void SAUtils::MarkEntityAsNotNeeded(CEntity* ent)
     }
 }
 
+void SAUtils::MarkModelAsNotNeeded(int modelId)
+{
+    static DEFOPCODE(0249, MARK_MODEL_AS_NO_LONGER_NEEDED, "i");
+    ScriptCommand(&scm_MARK_MODEL_AS_NO_LONGER_NEEDED, modelId);
+}
+
 void SAUtils::PutPedInVehicle(CPed* ped, CVehicle* vehicle, int seat)
 {
     static DEFOPCODE(072A, TASK_WARP_CHAR_INTO_CAR_AS_DRIVER, "ii");

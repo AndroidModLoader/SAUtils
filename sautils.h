@@ -119,6 +119,7 @@ public:
     CVehicle*       CreateVehicle(int modelId, float x, float y, float z, int *ref = NULL);
     CObject*        CreateObject(int modelId, float x, float y, float z, int *ref = NULL);
     void            MarkEntityAsNotNeeded(CEntity* ent);
+    void            MarkModelAsNotNeeded(int modelId);
     void            PutPedInVehicle(CPed* ped, CVehicle* vehicle, int seat = -1);
 
 public:
