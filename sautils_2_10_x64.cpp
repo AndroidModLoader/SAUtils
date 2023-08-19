@@ -1410,7 +1410,7 @@ CPed* SAUtils::CreatePed(int pedType, int modelId, float x, float y, float z, in
     int scmHandle = 0;
     ScriptCommand(&scm_CREATE_CHAR, pedType, modelId, x, y, z, &scmHandle);
     if(ref) *ref = scmHandle;
-    return GetPedFromRef(scmHandle);
+    return (*ms_pPedPool)->GetAtRef(scmHandle);
 }
 
 CPed* SAUtils::CreatePed(int pedType, int modelId, CVehicle* vehicle, int seat, int *ref)
@@ -1424,7 +1424,7 @@ CPed* SAUtils::CreatePed(int pedType, int modelId, CVehicle* vehicle, int seat, 
     if(seat < 0) ScriptCommand(&scm_CREATE_CHAR_INSIDE_CAR, vehicleRef, pedType, modelId, &scmHandle);
     else ScriptCommand(&scm_CREATE_CHAR_AS_PASSENGER, vehicleRef, pedType, modelId, seat, &scmHandle);
     if(ref) *ref = scmHandle;
-    return GetPedFromRef(scmHandle);
+    return (*ms_pPedPool)->GetAtRef(scmHandle);
 }
 
 CVehicle* SAUtils::CreateVehicle(int modelId, float x, float y, float z, int *ref)
@@ -1433,7 +1433,7 @@ CVehicle* SAUtils::CreateVehicle(int modelId, float x, float y, float z, int *re
     int scmHandle = 0;
     ScriptCommand(&scm_CREATE_CAR, modelId, x, y, z, &scmHandle);
     if(ref) *ref = scmHandle;
-    return GetVehicleFromRef(scmHandle);
+    return (*ms_pVehiclePool)->GetAtRef(scmHandle);
 }
 
 CObject* SAUtils::CreateObject(int modelId, float x, float y, float z, int *ref)
@@ -1442,7 +1442,7 @@ CObject* SAUtils::CreateObject(int modelId, float x, float y, float z, int *ref)
     int scmHandle = 0;
     ScriptCommand(&scm_CREATE_OBJECT, modelId, x, y, z, &scmHandle);
     if(ref) *ref = scmHandle;
-    return GetObjectFromRef(scmHandle);
+    return (*ms_pObjectPool)->GetAtRef(scmHandle);
 }
 
 void SAUtils::MarkEntityAsNotNeeded(CEntity* ent)
