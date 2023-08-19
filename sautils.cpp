@@ -1241,9 +1241,7 @@ int SAUtils::ScriptCommand(const SCRIPT_COMMAND *pScriptCommand, ...)
 {
     va_list ap;
     va_start(ap, pScriptCommand);
-    int ret = ScriptSACommandInner(pScriptCommand, ap);
-    va_end(ap);
-    return ret;
+    return ScriptSACommandInner(pScriptCommand, ap);
 }
 
 void SAUtils::AddOnRenderListener(eRenderOfType typeOf, SimpleDataFn fn)
@@ -1443,59 +1441,65 @@ void SAUtils::SetAngle(CPhysical* ent, float x, float y, float z)
     }
 }
 
+int scmHandle1, scmHandle2;
 void SAUtils::LoadModelId(int modelId)
 {
     static DEFOPCODE(0247, REQUEST_MODEL, i);
     static DEFOPCODE(038B, LOAD_ALL_MODELS_NOW, );
-    ScriptCommand(&scm_REQUEST_MODEL, modelId);
-    ScriptCommand(&scm_LOAD_ALL_MODELS_NOW);
+    SAUtils::ScriptCommand(&scm_REQUEST_MODEL, modelId);
+    SAUtils::ScriptCommand(&scm_LOAD_ALL_MODELS_NOW);
 }
 
 void SAUtils::LoadArea(float x, float y)
 {
     static DEFOPCODE(04E4, REQUEST_COLLISION, ff);
-    ScriptCommand(&scm_REQUEST_COLLISION, x, y);
+    SAUtils::ScriptCommand(&scm_REQUEST_COLLISION, x, y);
 }
 
 CPed* SAUtils::CreatePed(int pedType, int modelId, float x, float y, float z, int *ref)
 {
     static DEFOPCODE(009A, CREATE_CHAR, iifffv);
-    int scmHandle = 0;
-    ScriptCommand(&scm_CREATE_CHAR, pedType, modelId, x, y, z, &scmHandle);
-    if(ref) *ref = scmHandle;
-    return (*ms_pPedPool)->GetAtRef(scmHandle);
+    // int scmHandle1; // DO NOT DO THIS. LOOK AT THE LINE #1444! DEFINE THE VARIABLE OUTSIDE OF THE FUNCTION.
+    // static int scmHandle1; // this should work tho
+    scmHandle1 = 0;
+    SAUtils::ScriptCommand(&scm_CREATE_CHAR, pedType, modelId, x, y, z, &scmHandle1);
+    if(ref) *ref = scmHandle1;
+    return (*ms_pPedPool)->GetAtRef(scmHandle1);
 }
 
 CPed* SAUtils::CreatePed(int pedType, int modelId, CVehicle* vehicle, int seat, int *ref)
 {
     static DEFOPCODE(0129, CREATE_CHAR_INSIDE_CAR, iiiv);
     static DEFOPCODE(01C8, CREATE_CHAR_AS_PASSENGER, iiiiv);
-    int scmHandle = 0;
-    if(!(*ms_pVehiclePool)->IsFromObjectArray(vehicle)) return NULL;
+    if((*ms_pVehiclePool)->IsFromObjectArray(vehicle))
+    {
+        int vehicleRef = (*ms_pVehiclePool)->GetRef(vehicle);
+        scmHandle1 = 0;
+        if(seat < 0) SAUtils::ScriptCommand(&scm_CREATE_CHAR_INSIDE_CAR, vehicleRef, pedType, modelId, &scmHandle1);
+        else SAUtils::ScriptCommand(&scm_CREATE_CHAR_AS_PASSENGER, vehicleRef, pedType, modelId, seat, &scmHandle1);
 
-    int vehicleRef = (*ms_pVehiclePool)->GetRef(vehicle);
-    if(seat < 0) ScriptCommand(&scm_CREATE_CHAR_INSIDE_CAR, vehicleRef, pedType, modelId, &scmHandle);
-    else ScriptCommand(&scm_CREATE_CHAR_AS_PASSENGER, vehicleRef, pedType, modelId, seat, &scmHandle);
-    if(ref) *ref = scmHandle;
-    return (*ms_pPedPool)->GetAtRef(scmHandle);
+        if(ref) *ref = scmHandle1;
+        return (*ms_pPedPool)->GetAtRef(scmHandle1);
+    }
+    return NULL;
 }
 
 CVehicle* SAUtils::CreateVehicle(int modelId, float x, float y, float z, int *ref)
 {
     static DEFOPCODE(00A5, CREATE_CAR, ifffv);
-    int scmHandle = 0;
-    ScriptCommand(&scm_CREATE_CAR, modelId, x, y, z, &scmHandle);
-    if(ref) *ref = scmHandle;
-    return (*ms_pVehiclePool)->GetAtRef(scmHandle);
+    scmHandle1 = 0;
+    SAUtils::ScriptCommand(&scm_CREATE_CAR, modelId, x, y, z, &scmHandle1);
+    if(ref) *ref = scmHandle1;
+    return (*ms_pVehiclePool)->GetAtRef(scmHandle1);
 }
 
 CObject* SAUtils::CreateObject(int modelId, float x, float y, float z, int *ref)
 {
     static DEFOPCODE(0107, CREATE_OBJECT, ifffv);
-    int scmHandle = 0;
-    ScriptCommand(&scm_CREATE_OBJECT, modelId, x, y, z, &scmHandle);
-    if(ref) *ref = scmHandle;
-    return (*ms_pObjectPool)->GetAtRef(scmHandle);
+    scmHandle1 = 0;
+    SAUtils::ScriptCommand(&scm_CREATE_OBJECT, modelId, x, y, z, &scmHandle1);
+    if(ref) *ref = scmHandle1;
+    return (*ms_pObjectPool)->GetAtRef(scmHandle1);
 }
 
 void SAUtils::MarkEntityAsNotNeeded(CEntity* ent)
@@ -1508,13 +1512,13 @@ void SAUtils::MarkEntityAsNotNeeded(CEntity* ent)
         default: return;
 
         case ENTITY_TYPE_PED:
-            if((*ms_pPedPool)->IsObjectValid((CPed*)ent)) ScriptCommand(&scm_MARK_CHAR_AS_NO_LONGER_NEEDED, (*ms_pPedPool)->GetRef((CPed*)ent));
+            if((*ms_pPedPool)->IsObjectValid((CPed*)ent)) SAUtils::ScriptCommand(&scm_MARK_CHAR_AS_NO_LONGER_NEEDED, (*ms_pPedPool)->GetRef((CPed*)ent));
             return;
         case ENTITY_TYPE_OBJECT:
-            if((*ms_pObjectPool)->IsObjectValid((CObject*)ent)) ScriptCommand(&scm_MARK_OBJECT_AS_NO_LONGER_NEEDED, (*ms_pObjectPool)->GetRef((CObject*)ent));
+            if((*ms_pObjectPool)->IsObjectValid((CObject*)ent)) SAUtils::ScriptCommand(&scm_MARK_OBJECT_AS_NO_LONGER_NEEDED, (*ms_pObjectPool)->GetRef((CObject*)ent));
             return;
         case ENTITY_TYPE_VEHICLE:
-            if((*ms_pVehiclePool)->IsObjectValid((CVehicle*)ent)) ScriptCommand(&scm_MARK_CAR_AS_NO_LONGER_NEEDED, (*ms_pVehiclePool)->GetRef((CVehicle*)ent));
+            if((*ms_pVehiclePool)->IsObjectValid((CVehicle*)ent)) SAUtils::ScriptCommand(&scm_MARK_CAR_AS_NO_LONGER_NEEDED, (*ms_pVehiclePool)->GetRef((CVehicle*)ent));
             return;
     }
 }
@@ -1522,7 +1526,7 @@ void SAUtils::MarkEntityAsNotNeeded(CEntity* ent)
 void SAUtils::MarkModelAsNotNeeded(int modelId)
 {
     static DEFOPCODE(0249, MARK_MODEL_AS_NO_LONGER_NEEDED, i);
-    ScriptCommand(&scm_MARK_MODEL_AS_NO_LONGER_NEEDED, modelId);
+    SAUtils::ScriptCommand(&scm_MARK_MODEL_AS_NO_LONGER_NEEDED, modelId);
 }
 
 void SAUtils::PutPedInVehicle(CPed* ped, CVehicle* vehicle, int seat)
@@ -1532,11 +1536,10 @@ void SAUtils::PutPedInVehicle(CPed* ped, CVehicle* vehicle, int seat)
     if(!(*ms_pPedPool)->IsObjectValid(ped) ||
        !(*ms_pVehiclePool)->IsObjectValid(vehicle)) return;
 
-    int pedRef = (*ms_pPedPool)->GetRef(ped);
-    int vehicleRef = (*ms_pVehiclePool)->GetRef(vehicle);
+    int pedRef = (*ms_pPedPool)->GetRef(ped), vehicleRef = (*ms_pVehiclePool)->GetRef(vehicle);
 
-    if(seat < 0) ScriptCommand(&scm_TASK_WARP_CHAR_INTO_CAR_AS_DRIVER, pedRef, vehicleRef);
-    else ScriptCommand(&scm_WARP_CHAR_INTO_CAR_AS_PASSENGER, pedRef, vehicleRef, seat);
+    if(seat < 0) SAUtils::ScriptCommand(&scm_TASK_WARP_CHAR_INTO_CAR_AS_DRIVER, pedRef, vehicleRef);
+    else SAUtils::ScriptCommand(&scm_WARP_CHAR_INTO_CAR_AS_PASSENGER, pedRef, vehicleRef, seat);
 }
 
 static SAUtils sautilsLocal;

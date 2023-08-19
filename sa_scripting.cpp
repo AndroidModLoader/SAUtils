@@ -5,7 +5,7 @@
 
 // Our variables
 GAME_SCRIPT_THREAD* gst;
-char ScriptBuf[0xFF];
+char ScriptBuf[512];
 uintptr_t *pdwParamVars[18];
 extern void* pGameHandle;
 
@@ -27,8 +27,8 @@ inline uint8_t ExecuteScriptBuf()
 
 int ScriptSACommandInner(const SCRIPT_COMMAND *pScriptCommand, va_list ap)
 {
-    const char* p = pScriptCommand->params;
-    memcpy(&ScriptBuf, &pScriptCommand->opCode, 2);
+    const char *p = &pScriptCommand->params[0];
+    memcpy(&ScriptBuf[0], &pScriptCommand->opCode, 2);
     int buf_pos = 2;
     uint16_t var_pos = 0;
 
@@ -94,18 +94,19 @@ int ScriptSACommandInner(const SCRIPT_COMMAND *pScriptCommand, va_list ap)
             default:
             {
                 logger->Error("An attempt to call opcode %04X with an unknown arguments description -> (%s)", pScriptCommand->opCode, pScriptCommand->params);
+                va_end(ap);
                 return 0;
             }
         }
         ++p;
     }
+    va_end(ap);
 
     int result = ExecuteScriptBuf();
     if (var_pos)
     {
         for (int i = 0; i < var_pos; ++i) *pdwParamVars[i] = gst->dwLocalVar[i];
     }
-
     return result;
 }
 
@@ -113,7 +114,5 @@ int ScriptSACommand(const SCRIPT_COMMAND *pScriptCommand, ...)
 {
     va_list ap;
     va_start(ap, pScriptCommand);
-    int ret = ScriptSACommandInner(pScriptCommand, ap);
-    va_end(ap);
-    return ret;
+    return ScriptSACommandInner(pScriptCommand, ap);
 }

@@ -44,7 +44,7 @@ jobs:
         local-cache: true
 
     - name: Build the code...
-      run: ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=./Android.mk NDK_APPLICATION_MK=./Application.mk
+      run: ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=./Android.mk NDK_APPLICATION_MK=./Application.mk NDK_DEBUG=0 -j5
 
     - name: Upload the mod!
       uses: actions/upload-artifact@v3

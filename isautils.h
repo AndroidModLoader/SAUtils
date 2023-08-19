@@ -507,7 +507,11 @@ public:
      */
     virtual int AddSliderItem(eTypeOfSettings typeOf, const char* name, int initVal, int minVal, int maxVal, OnSettingChangedFn fnOnValueChange, OnSettingDrawedFn fnOnValueDraw, void* data) = 0;
 
-    /** Calls a script opcode (mini-cleo)
+    /** Calls a script opcode (mini-cleo).
+     *  A serious crash may appear if you are using this function and one of the arguments is a pointer (&scmHandle).
+     *  Make sure, that the variable you need pointer for (scmHandle1 in this case)
+     *  is defined OUTSIDE of the function, otherwise the stack corruption and crash will be your best friends!
+     *  For more info, check SAUtils's sautils.cpp, line #1462, you will see.
      *
      *  \param pScriptCommand A pointer to SCRIPT_COMMAND struct var
      *  \param ... All arguments

@@ -10,7 +10,7 @@ else
     LOCAL_MODULE    := SAUtils64
     LOCAL_SRC_FILES += sautils_2_10_x64.cpp
 endif
-LOCAL_CFLAGS += -O2 -mfloat-abi=softfp -DNDEBUG -std=c++17
+LOCAL_CFLAGS += -O2 -mfloat-abi=softfp -DNDEBUG
 LOCAL_C_INCLUDES += ./include
 LOCAL_LDLIBS += -llog # ARM64 library requires it so...
 include $(BUILD_SHARED_LIBRARY)
